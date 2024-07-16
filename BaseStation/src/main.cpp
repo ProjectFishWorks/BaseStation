@@ -6,6 +6,8 @@
 
 #include <PubSubClient.h>
 
+#include <ArduinoJson.h>
+
 NodeControllerCore core;
 
 WiFiClient espClient;
@@ -16,11 +18,42 @@ PubSubClient mqttClient(espClient);
 
 const char* mqtt_server = "broker.mqtt-dashboard.com";
 
+//Time
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 0;
+const int   daylightOffset_sec = 3600;
+
+void printLocalTime()
+{
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+}
+
 void receive_message(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     Serial.println("Message received callback");
     Serial.println("Sending message to MQTT");
     String topic = String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID) + "/out";
-    String payload = String(data);
+    
+    // Allocate the JSON document
+    JsonDocument doc;
+
+    time_t now;
+    struct tm timeinfo;
+    if(!getLocalTime(&timeinfo)){
+      Serial.println("Failed to obtain time");
+      return;
+    }
+
+    // Add values in the document
+    time(&now);
+    doc["time"] = now;
+    doc["data"] = data;
+
+    String payload = String(doc.as<String>());
     mqttClient.publish(topic.c_str(), payload.c_str());
 }
 
@@ -57,6 +90,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
+
+  
+
 }
 
 
@@ -108,6 +144,10 @@ void setup() {
 
     mqttClient.setServer(mqtt_server, 1883);
     mqttClient.setCallback(callback);
+
+    // Start the NTP Client
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    printLocalTime();
 
 }
 
