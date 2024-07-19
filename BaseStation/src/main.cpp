@@ -1,6 +1,10 @@
 #include <Arduino.h>
 
+#include "credential.h"
+
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+
+#include "WiFiClientSecure.h"
 
 #include <NodeControllerCore.h>
 
@@ -16,7 +20,10 @@ PubSubClient mqttClient(espClient);
 #define systemID 0x00
 #define baseStationID 0x00
 
-const char* mqtt_server = "broker.mqtt-dashboard.com";
+const char* mqtt_server = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
+
+const char* mqtt_username = "fishworks-dev";
+const char* mqtt_password = "F1shworks!";
 
 //Time
 const char* ntpServer = "pool.ntp.org";
@@ -36,7 +43,7 @@ void printLocalTime()
 void receive_message(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     Serial.println("Message received callback");
     Serial.println("Sending message to MQTT");
-    String topic = String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID) + "/out";
+    String topic = "out/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID);
     
     // Allocate the JSON document
     JsonDocument doc;
@@ -70,7 +77,7 @@ void reconnect() {
       // Once connected, publish an announcement...
       //mqttClient.publish("ECET260/outSebastien", "hello world");
       // ... and resubscribe
-      String topic = String(systemID) + "/" + String(baseStationID) + "/in/#";
+      String topic = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
       mqttClient.subscribe(topic.c_str());
     } else {
       Serial.print("failed, rc=");
@@ -90,7 +97,35 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
+  // in/systemID/baseStationID/nodeID/messageID/in
+  String topicString = String(topic);
+  int index = 0;
+  index = topicString.indexOf("/", index);
+  index = topicString.indexOf("/", index + 1);
+  index = topicString.indexOf("/", index + 1);
+  int nodeID = topicString.substring(index + 1, topicString.indexOf("/", index + 1)).toInt();
+  index = topicString.indexOf("/", index + 1);
+  int messageID = topicString.substring(index + 1, topicString.indexOf("/", index + 1)).toInt();
+  
+  Serial.print("Node ID: ");
+  Serial.println(nodeID);
+  Serial.print("Message ID: ");
+  Serial.println(messageID);
 
+  // Allocate the JSON document
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, payload);
+  if(error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.c_str());
+    return;
+  }
+
+  uint64_t data = doc["data"];
+  Serial.print("Data: ");
+  Serial.println(data);
+
+  core.sendMessage(messageID, &data);
   
 
 }
