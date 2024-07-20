@@ -10,17 +10,18 @@
 
 #include <PubSubClient.h>
 
-#include <ArduinoJson.h>
+#include <ArduinoJson.h>                                      
+
 
 NodeControllerCore core;
 
-WiFiClient espClient;
+WiFiClientSecure espClient;
 PubSubClient mqttClient(espClient);
 
 #define systemID 0x00
 #define baseStationID 0x00
 
-const char* mqtt_server = "broker.mqtt-dashboard.com";
+const char* mqtt_server = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
 
 const char* mqtt_username = "fishworks-dev";
 const char* mqtt_password = "F1shworks!";
@@ -68,7 +69,7 @@ void reconnect() {
     String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
-    if (mqttClient.connect(clientId.c_str())) {
+    if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
       // Once connected, publish an announcement...
       //mqttClient.publish("ECET260/outSebastien", "hello world");
@@ -173,7 +174,9 @@ void setup() {
         Serial.println("Node Controller Core Failed to Start");
     }
 
-    mqttClient.setServer(mqtt_server, 1883);
+    espClient.setCACert(CA_cert);  
+
+    mqttClient.setServer(mqtt_server, 8883);
     mqttClient.setCallback(callback);
 
     // Start the NTP Client
