@@ -20,7 +20,7 @@ PubSubClient mqttClient(espClient);
 #define systemID 0x00
 #define baseStationID 0x00
 
-const char* mqtt_server = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
+const char* mqtt_server = "broker.mqtt-dashboard.com";
 
 const char* mqtt_username = "fishworks-dev";
 const char* mqtt_password = "F1shworks!";
@@ -34,7 +34,7 @@ void printLocalTime()
 {
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
+    Serial.println("Failed to obtain time!");
     return;
   }
   Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
@@ -49,11 +49,6 @@ void receive_message(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     JsonDocument doc;
 
     time_t now;
-    struct tm timeinfo;
-    if(!getLocalTime(&timeinfo)){
-      Serial.println("Failed to obtain time");
-      return;
-    }
 
     // Add values in the document
     time(&now);
@@ -61,6 +56,7 @@ void receive_message(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     doc["data"] = data;
 
     String payload = String(doc.as<String>());
+
     mqttClient.publish(topic.c_str(), payload.c_str());
 }
 
