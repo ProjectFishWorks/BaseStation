@@ -56,7 +56,7 @@ void receive_message(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     doc["time"] = now;
     doc["data"] = data;
 
-    String payload = String(doc["data"].as<String>());
+    String payload = String(doc.as<String>());
 
     mqttClient.publish(topic.c_str(), payload.c_str());
 }
@@ -118,6 +118,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
+  //Don't use doc["data"].as<uint64_t>() because it will cause a zero to be sent over the CAN bus
   uint64_t data = doc["data"];
   Serial.print("Data: ");
   Serial.println(data);
