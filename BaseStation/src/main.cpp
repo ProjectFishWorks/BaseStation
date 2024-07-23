@@ -56,7 +56,7 @@ void receive_message(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     doc["time"] = now;
     doc["data"] = data;
 
-    String payload = String(doc.as<String>());
+    String payload = String(doc["data"].as<String>());
 
     mqttClient.publish(topic.c_str(), payload.c_str());
 }
@@ -122,6 +122,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Data: ");
   Serial.println(data);
 
+  core.nodeID = nodeID;
   core.sendMessage(messageID, &data);
   
 
