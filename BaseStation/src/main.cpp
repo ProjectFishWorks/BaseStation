@@ -1,5 +1,9 @@
 #include <Arduino.h>
 
+#include <SPI.h>
+
+#include <SD.h>
+
 #include "credential.h"
 
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
@@ -33,6 +37,14 @@ const int   daylightOffset_sec = 3600;
 
 //Global data fix for pointer issues
 uint64_t data = 0;
+
+//SD Card
+
+int sck = 3;
+int miso = 2;
+int mosi = 1;
+int cs = 0;
+
 
 void printLocalTime()
 {
@@ -168,6 +180,35 @@ void setup() {
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
     }
+
+    //Start SD Card
+    SPI.begin(sck, miso, mosi, cs);
+    if (!SD.begin(cs)) {
+        Serial.println("Card Mount Failed");
+    }else{
+        Serial.println("Card Mount Success");
+    }
+    uint8_t cardType = SD.cardType();
+
+    if (cardType == CARD_NONE) {
+      Serial.println("No SD card attached");
+      return;
+    }
+
+    Serial.print("SD Card Type: ");
+    if (cardType == CARD_MMC) {
+      Serial.println("MMC");
+    } else if (cardType == CARD_SD) {
+      Serial.println("SDSC");
+    } else if (cardType == CARD_SDHC) {
+      Serial.println("SDHC");
+    } else {
+      Serial.println("UNKNOWN");
+    }
+
+    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+    Serial.printf("SD Card Size: %lluMB\n", cardSize);
+
 
     // Start the Node Controller
     core = NodeControllerCore();
