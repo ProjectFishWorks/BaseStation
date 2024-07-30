@@ -31,6 +31,9 @@ const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 0;
 const int   daylightOffset_sec = 3600;
 
+//Global data fix for pointer issues
+uint64_t data = 0;
+
 void printLocalTime()
 {
   struct tm timeinfo;
@@ -119,7 +122,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   //Don't use doc["data"].as<uint64_t>() because it will cause a zero to be sent over the CAN bus
-  uint64_t data = doc["data"];
+  data = doc["data"];
   Serial.print("Data: ");
   Serial.println(data);
 
