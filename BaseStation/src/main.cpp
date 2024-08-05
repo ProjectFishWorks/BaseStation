@@ -1,3 +1,4 @@
+//Imports
 #include <Arduino.h>
 
 #include <SPI.h>
@@ -14,58 +15,73 @@
 
 #include <PubSubClient.h>
 
-#include <ArduinoJson.h>                                      
+#include <ArduinoJson.h>
 
-
-NodeControllerCore core;
-
-WiFiClientSecure espClient;
-PubSubClient mqttClient(espClient);
-
-#define systemID 0x00
-#define baseStationID 0x00
+//TODO: Temp until final versioning system is implemented
 #define baseStationFirmwareVersion 0.01
 
-const char* mqtt_server = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
+//TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
+#define systemID 0x00
+#define baseStationID 0x00
 
-const char* mqtt_username = "fishworks-dev";
-const char* mqtt_password = "F1shworks!";
+//TODO: MQTT Credentials - temp until these are added to WiFiManager system
+#define mqtt_server "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud"
+#define mqtt_username "fishworks-dev"
+#define mqtt_password "F1shworks!"
 
 //Time
-const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = 0;
-const int   daylightOffset_sec = 3600;
+//TODO: add timezone support to WiFiManager
+#define ntpServer "pool.ntp.org"
+#define gmtOffset_sec 0
+#define daylightOffset_sec 3600
 
-//Log file write queue
+//SD Card Pins
+#define sck 3
+#define miso 2
+#define mosi 1
+#define cs 0
+
+//Node Controller Core - temp usage coustom code for base station is created
+NodeControllerCore core;
+
+//WiFi client
+WiFiClientSecure espClient;
+
+//MQTT client
+PubSubClient mqttClient(espClient);
+
+//TODO: Log file write queue - not working right now
 QueueHandle_t log_file_queue;
-
 #define LOG_FILE_QUEUE_LENGTH 10
 
-//Global data fix for pointer issues
+//Global data fix for pointer issues, TODO fix this shit
 uint64_t data = 0;
 
-//SD Card
-
-int sck = 3;
-int miso = 2;
-int mosi = 1;
-int cs = 0;
-
+//Get the current log file name based on the current time
+//Currently creates one log file per hour
 void getCurrentLogFilename(char* filename) {
-  time_t now;
+  //Buffer to hold the current date/time
   char timeString[255];
+  //Time object
   struct tm timeinfo;
+  //If we can't get the current time, add a default filename
   if(!getLocalTime(&timeinfo)){
     Serial.println("Failed to obtain time!");
     strcpy(filename, "log-no-time.csv");
     return;
   }
-
+  
+  //Format the data/time
   strftime(timeString, 255, "-%Y-%m-%d-%H.csv", &timeinfo);
+
+  //Combine the date/time with system and base station ID
   String filenameString = "/log-" + String(systemID) + "-" + String(baseStationID) + timeString;;
+
+  //Copy the final string to the filename pointer
   filenameString.toCharArray(filename, filenameString.length() + 1);
 }
 
+//Write the header info to the log file
 void writeLogHeader(File *file) {
   file->println(("SystemID," + String(systemID)));
   file->println("BaseStationID," + String(baseStationID));
@@ -77,16 +93,20 @@ void writeLogHeader(File *file) {
   file->println("Time,NodeID,MessageID,Data");
 }
 
+//Creates a row of data for the log file
 String getLogDataRow(File *file, uint8_t nodeID, uint16_t messageID, uint64_t data) {
   time_t now;
   time(&now);
   return String(now) + "," + String(nodeID) + "," + String(messageID) + "," + String(data);
 }
 
+//Open the log file and creates a new one if it doesn't exist
 void openLogFile(File *file) {
+  //Get the current filename based on the current time
   char filename[255];
   getCurrentLogFilename(filename);
 
+  //If the file exists, open it in append mode, otherwise create a new file
   if(SD.exists(filename)) {
     *file = SD.open(filename, FILE_APPEND);
   } else {
@@ -96,6 +116,7 @@ void openLogFile(File *file) {
   }
 }
 
+//Not working right now, TODO fix this shit
 void  writeLogFileQueueTask(void *queue) {
   File logFile;
   while(1) {
@@ -110,61 +131,65 @@ void  writeLogFileQueueTask(void *queue) {
   }
 }
 
-
-void printLocalTime()
-{
-  struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time!");
-    return;
-  }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-}
-
-void receive_message(uint8_t nodeID, uint16_t messageID, uint64_t data) {
+//Function that is called when a CAN Bus message is received
+void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     Serial.println("Message received callback");
     Serial.println("Sending message to MQTT");
+
+    //Create the MQTT topic string
     String topic = "out/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID);
     
     // Allocate the JSON document
     JsonDocument doc;
 
+    //Add the current time and the data from the CAN Bus message to the JSON doc
     time_t now;
-
-    // Add values in the document
     time(&now);
     doc["time"] = now;
     doc["data"] = data;
 
+    //Convert the JSON Doc to text
     String payload = String(doc.as<String>());
 
+    //Send the message to the MQTT broker
     mqttClient.publish(topic.c_str(), payload.c_str());
 
+    //Log the CAN Bus message to the SD card
+
+    //Create the log data row
     String logData = getLogDataRow(NULL, nodeID, messageID, data);
+
     File logFile;
     char filename[255];
     getCurrentLogFilename(filename);
+    //For when we get the log file queue working, for now just write directly to the file
     //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
+
+    //Open the log file
     openLogFile(&logFile);
+    //Write the log data row to the log file
     logFile.println(logData);
     Serial.println("Wrote to log file : " + logData);
+    //Close the log file
     logFile.close();
 
 }
 
-void reconnect() {
+//Function to connect to the MQTT broker
+void MQTTConnect() {
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
+    //TODO: use the system ID and base station ID to create a unique client ID?
     String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
+
     // Attempt to connect
     if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
-      // Once connected, publish an announcement...
-      //mqttClient.publish("ECET260/outSebastien", "hello world");
-      // ... and resubscribe
+
+      //Subscribe to the MQTT topic for this base station
       String topic = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
       mqttClient.subscribe(topic.c_str());
     } else {
@@ -177,7 +202,7 @@ void reconnect() {
   }
 }
 
-void callback(char* topic, byte* payload, unsigned int length) {
+void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
@@ -185,7 +210,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
-  // in/systemID/baseStationID/nodeID/messageID/in
+
+  //Parse the topic to get the node ID and message ID with the format:
+  // in/systemID/baseStationID/nodeID/messageID/
   String topicString = String(topic);
   int index = 0;
   index = topicString.indexOf("/", index);
@@ -202,7 +229,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   // Allocate the JSON document
   JsonDocument doc;
+
+  // Parse the JSON object
   DeserializationError error = deserializeJson(doc, payload);
+
+  // Test if parsing succeeds
   if(error) {
     Serial.print(F("deserializeJson() failed: "));
     Serial.println(error.c_str());
@@ -210,33 +241,41 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   //Don't use doc["data"].as<uint64_t>() because it will cause a zero to be sent over the CAN bus
+  //TODO fix this global variable hack
   data = doc["data"];
   Serial.print("Data: ");
   Serial.println(data);
 
+  //Set the node ID in the Node Controller Core to the node ID of the received message
+  //TODO: This is a workaround until we move the Node Controller Core code to the base station codebase
   core.nodeID = nodeID;
+
+  //Send the message to the CAN Bus
   core.sendMessage(messageID, &data);
 
-    String logData = getLogDataRow(NULL, nodeID, messageID, data);
-    File logFile;
-    char filename[255];
-    getCurrentLogFilename(filename);
-    //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
-    openLogFile(&logFile);
-    logFile.println(logData);
-    Serial.println("Wrote to log file : " + logData);
-    logFile.close();
+  //Log the message to the SD card
+
+  //Create the log data row
+  String logData = getLogDataRow(NULL, nodeID, messageID, data);
+  File logFile;
+  char filename[255];
+  getCurrentLogFilename(filename);
+  //TODO: For when we get the log file queue working, for now just write directly to the file
+  //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
+  openLogFile(&logFile);
+  logFile.println(logData);
+  Serial.println("Wrote to log file : " + logData);
+  logFile.close();
   
 
 }
 
 
 void setup() {
-    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-    // it is a good practice to make sure your code sets wifi mode how you want it.
-
-    // put your setup code here, to run once:
+    //Start the serial connection
     Serial.begin(115200);
+
+    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
     
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wm;
@@ -251,10 +290,8 @@ void setup() {
     // then goes into a blocking loop awaiting configuration and will return success result
 
     bool res;
-    // res = wm.autoConnect(); // auto generated AP name from chipid
-    // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
-    res = wm.autoConnect("Project Fish Works Base Station"); // password protected ap
-
+    //TODO generate a unique name for the base station based on the system ID and base station ID
+    res = wm.autoConnect("Project Fish Works Base Station");
     if(!res) {
         Serial.println("Failed to connect");
         // ESP.restart();
@@ -269,11 +306,8 @@ void setup() {
 
     // Start the NTP Client
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-    printLocalTime();
 
-    //delay(2000);
-
-    //Start SD Card
+    //Mount the SD Card
     SPI.begin(sck, miso, mosi, cs);
     if (!SD.begin(cs)) {
         Serial.println("Card Mount Failed");
@@ -301,36 +335,40 @@ void setup() {
     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
     Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
+    //TODO: For when we get the log file queue working
     //log_file_queue = xQueueCreate(LOG_FILE_QUEUE_LENGTH, sizeof(String));
-
     //xTaskCreate(writeLogFileQueueTask, "writeLogFileQueueTask", 10000, &log_file_queue, 1, NULL);
 
+    //TODO: is this were we should start the Node Controller Core?
     // Start the Node Controller
     core = NodeControllerCore();
-
-    // Start the Node Controller
-    if(core.Init(receive_message, 0x00)){
+    if(core.Init(receivedCANBUSMessage, 0x00)){
         Serial.println("Node Controller Core Started");
     } else {
         Serial.println("Node Controller Core Failed to Start");
     }
 
+    //Set the WiFi client to use the CA certificate from HiveMQ
+    //Got it from here: https://community.hivemq.com/t/frequently-asked-questions-hivemq-cloud/514
     espClient.setCACert(CA_cert);  
 
+    //Set the MQTT server and port
     mqttClient.setServer(mqtt_server, 8883);
-    mqttClient.setCallback(callback);
 
-    Serial.println("Current Log File Name:");
-    char filename[255];
-    getCurrentLogFilename(filename);
-    Serial.println(filename);
+    //Set the MQTT callback function
+    mqttClient.setCallback(receivedMQTTMessage);
+
+    //TODO: Add a check to see if the SD card is still mounted, if not remount it
+    //TODO: Add a check to see if the WiFi is still connected, if not reconnect
 
 }
 
 void loop() {
-    // put your main code here, to run repeatedly:
+
+    //TODO: Move the MQTT connection to a separate task
+    //If the MQTT is not connected, or has disconnect4ed for some reason, connect to the MQTT broker
     if (!mqttClient.connected()) {
-        reconnect();
+        MQTTConnect();
     }
     mqttClient.loop();   
 }
