@@ -24,6 +24,7 @@ PubSubClient mqttClient(espClient);
 
 #define systemID 0x00
 #define baseStationID 0x00
+#define baseStationFirmwareVersion 0.01
 
 const char* mqtt_server = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
 
@@ -35,6 +36,11 @@ const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 0;
 const int   daylightOffset_sec = 3600;
 
+//Log file write queue
+QueueHandle_t log_file_queue;
+
+#define LOG_FILE_QUEUE_LENGTH 10
+
 //Global data fix for pointer issues
 uint64_t data = 0;
 
@@ -44,6 +50,65 @@ int sck = 3;
 int miso = 2;
 int mosi = 1;
 int cs = 0;
+
+void getCurrentLogFilename(char* filename) {
+  time_t now;
+  char timeString[255];
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time!");
+    strcpy(filename, "log-no-time.csv");
+    return;
+  }
+
+  strftime(timeString, 255, "-%Y-%m-%d-%H.csv", &timeinfo);
+  String filenameString = "/log-" + String(systemID) + "-" + String(baseStationID) + timeString;;
+  filenameString.toCharArray(filename, filenameString.length() + 1);
+}
+
+void writeLogHeader(File *file) {
+  file->println(("SystemID," + String(systemID)));
+  file->println("BaseStationID," + String(baseStationID));
+  file->println("BaseStationFirmwareVersion," + String(baseStationFirmwareVersion));
+
+  time_t now;
+  time(&now);
+  file->println("Created," + String(now));
+  file->println("Time,NodeID,MessageID,Data");
+}
+
+String getLogDataRow(File *file, uint8_t nodeID, uint16_t messageID, uint64_t data) {
+  time_t now;
+  time(&now);
+  return String(now) + "," + String(nodeID) + "," + String(messageID) + "," + String(data);
+}
+
+void openLogFile(File *file) {
+  char filename[255];
+  getCurrentLogFilename(filename);
+
+  if(SD.exists(filename)) {
+    *file = SD.open(filename, FILE_APPEND);
+  } else {
+    Serial.println("Log file does not exist, creating new file with filename: " + String(filename));
+    *file = SD.open(filename, FILE_WRITE);
+    writeLogHeader(file);
+  }
+}
+
+void  writeLogFileQueueTask(void *queue) {
+  File logFile;
+  while(1) {
+    String logData;
+    if(xQueueReceive(*(QueueHandle_t *)queue, &logData, portMAX_DELAY) == pdTRUE) {
+      openLogFile(&logFile);
+      logFile.println(logData);
+      Serial.println("Wrote to log file : " + logData);
+    }else {
+      logFile.close();
+    }
+  }
+}
 
 
 void printLocalTime()
@@ -74,6 +139,17 @@ void receive_message(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     String payload = String(doc.as<String>());
 
     mqttClient.publish(topic.c_str(), payload.c_str());
+
+    String logData = getLogDataRow(NULL, nodeID, messageID, data);
+    File logFile;
+    char filename[255];
+    getCurrentLogFilename(filename);
+    //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
+    openLogFile(&logFile);
+    logFile.println(logData);
+    Serial.println("Wrote to log file : " + logData);
+    logFile.close();
+
 }
 
 void reconnect() {
@@ -140,6 +216,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   core.nodeID = nodeID;
   core.sendMessage(messageID, &data);
+
+    String logData = getLogDataRow(NULL, nodeID, messageID, data);
+    File logFile;
+    char filename[255];
+    getCurrentLogFilename(filename);
+    //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
+    openLogFile(&logFile);
+    logFile.println(logData);
+    Serial.println("Wrote to log file : " + logData);
+    logFile.close();
   
 
 }
@@ -181,6 +267,12 @@ void setup() {
         Serial.println(WiFi.localIP());
     }
 
+    // Start the NTP Client
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    printLocalTime();
+
+    //delay(2000);
+
     //Start SD Card
     SPI.begin(sck, miso, mosi, cs);
     if (!SD.begin(cs)) {
@@ -209,6 +301,9 @@ void setup() {
     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
     Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
+    //log_file_queue = xQueueCreate(LOG_FILE_QUEUE_LENGTH, sizeof(String));
+
+    //xTaskCreate(writeLogFileQueueTask, "writeLogFileQueueTask", 10000, &log_file_queue, 1, NULL);
 
     // Start the Node Controller
     core = NodeControllerCore();
@@ -225,9 +320,10 @@ void setup() {
     mqttClient.setServer(mqtt_server, 8883);
     mqttClient.setCallback(callback);
 
-    // Start the NTP Client
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-    printLocalTime();
+    Serial.println("Current Log File Name:");
+    char filename[255];
+    getCurrentLogFilename(filename);
+    Serial.println(filename);
 
 }
 
