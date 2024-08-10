@@ -152,7 +152,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     String payload = String(doc.as<String>());
 
     //Send the message to the MQTT broker
-    mqttClient.publish(topic.c_str(), payload.c_str());
+    mqttClient.publish(topic.c_str(), payload.c_str(), true);
 
     //Log the CAN Bus message to the SD card
 
