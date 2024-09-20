@@ -17,6 +17,20 @@
 
 #include <ArduinoJson.h>
 
+//Email
+#include <ESP_Mail_Client.h>
+// Declare the global used SMTPSession object for SMTP transport
+SMTPSession smtp;
+
+// Declare the global used Session_Config for user defined session credentials
+Session_Config config;
+
+// Callback function to get the Email sending status
+void smtpCallback(SMTP_Status status);
+
+#define WARN_ID 0x384 //900
+#define ALERT_ID 0x385 //901
+
 //TODO: Temp until final versioning system is implemented
 #define baseStationFirmwareVersion 0.01
 
@@ -154,6 +168,36 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     //Send the message to the MQTT broker
     mqttClient.publish(topic.c_str(), payload.c_str(), true);
 
+    //Check for alerts and warnings
+    if(messageID == WARN_ID || messageID == ALERT_ID) {
+      Serial.println("Alert or Warning message received");
+      Serial.println("Sending email");
+      //Send an email
+      SMTP_Message message;
+      // Set the message headers
+      message.sender.name = "My Mail";
+      message.sender.email = "projectfishworks@gmail.com";
+      message.subject = "Alert from Project Fish Works Base Station";
+      message.addRecipient("Sebastien Robitaille", "sebastien@robitaille.info");
+
+      // Set the message content
+      message.text.content = "Alert from Project Fish Works Base Station\n Node ID: " + String(nodeID) + "\n Message ID: " + String(messageID) + "\n Data: " + String(data);
+
+      // Set debug option
+      smtp.debug(1);
+
+      // Set the callback function to get the sending results
+      smtp.callback(smtpCallback);
+
+      // Connect to the server
+      smtp.connect(&config);
+
+      // Start sending Email and close the session
+      if (!MailClient.sendMail(&smtp, &message)){
+        Serial.println("Error sending Email, " + smtp.errorReason());
+      }
+
+    }
     //Log the CAN Bus message to the SD card
 
     //Create the log data row
@@ -361,6 +405,28 @@ void setup() {
     //TODO: Add a check to see if the SD card is still mounted, if not remount it
     //TODO: Add a check to see if the WiFi is still connected, if not reconnect
 
+    //Email
+    // Set the session config
+    config.server.host_name = "smtp.gmail.com"; // for outlook.com
+    config.server.port = 465; // for TLS with STARTTLS or 25 (Plain/TLS with STARTTLS) or 465 (SSL)
+    config.login.email = "projectfishoworks@gmail.com"; // set to empty for no SMTP Authentication
+    config.login.password = "jsrx dxdw each ebfc"; // set to empty for no SMTP Authentication
+
+    config.time.ntp_server = "pool.ntp.org,time.nist.gov";
+    config.time.gmt_offset = 0;
+    config.time.day_light_offset = 0;
+
+}
+
+void smtpCallback(SMTP_Status status)
+{
+ 
+  Serial.println(status.info());
+
+  if (status.success())
+  {
+    // See example for how to get the sending result
+  }
 }
 
 void loop() {
