@@ -21,8 +21,45 @@
 //Email
 #include <ESP_Mail_Client.h>
 
-// Declare the global used SMTPSession object for SMTP transport
+bool sendEmailFlag = false;
+
+QueueHandle_t emailQueue;
+
+/** For Gmail, the app password will be used for log in
+ *  Check out https://github.com/mobizt/ESP-Mail-Client#gmail-smtp-and-imap-required-app-passwords-to-sign-in
+ *
+ * For Yahoo mail, log in to your yahoo mail in web browser and generate app password by go to
+ * https://login.yahoo.com/account/security/app-passwords/add/confirm?src=noSrc
+ *
+ * To use Gmai and Yahoo's App Password to sign in, define the AUTHOR_PASSWORD with your App Password
+ * and AUTHOR_EMAIL with your account email.
+ */
+
+/** The smtp host name e.g. smtp.gmail.com for GMail or smtp.office365.com for Outlook or smtp.mail.yahoo.com */
+#define SMTP_HOST "smtp.gmail.com"
+
+/** The smtp port e.g.
+ * 25  or esp_mail_smtp_port_25
+ * 465 or esp_mail_smtp_port_465
+ * 587 or esp_mail_smtp_port_587
+ */
+#define SMTP_PORT esp_mail_smtp_port_465 // port 465 is not available for Outlook.com
+
+/* The log in credentials */
+#define AUTHOR_EMAIL "projectfishworks@gmail.com"
+#define AUTHOR_PASSWORD "qfow uumv dyzg iexf"
+
+/* Recipient email address */
+#define RECIPIENT_EMAIL "sebastien@robitaille.info"
+
+/* Declare the global used SMTPSession object for SMTP transport */
 SMTPSession smtp;
+
+/* Callback function to get the Email sending status */
+void smtpCallback(SMTP_Status status);
+
+void sendEmail();
+void setupEmail();
 
 // Declare the global used Session_Config for user defined session credentials
 Session_Config config;
@@ -175,36 +212,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
       Serial.println("Alert or Warning message received");
       Serial.println("Sending email");
       //Send an email
-      SMTP_Message message;
-      // Set the message headers
-      // Set the message headers
-      message.sender.name = "Base Station";
-      message.sender.email = "projectfishworks@gmail.com";
-      message.subject = "Test sending Email";
-      message.addRecipient("Sebastien Robitaille", "sebastien@robitaille.info");
-
-      // Set the message content
-      message.text.content = "Alert from Project Fish Works Base Station\n Node ID: " + String(nodeID) + "\n Message ID: " + String(messageID) + "\n Data: " + String(data);
-
-      // Set debug option
-      smtp.debug(1);
-
-      // Set the callback function to get the sending results
-      smtp.callback(smtpCallback);
-
-      Serial.println("Email ready to send");
-
-      // Connect to the server
-      smtp.connect(&config);
-
-      Serial.println("Connected to SMTP server");
-
-      // Start sending Email and close the session
-      if (!MailClient.sendMail(&smtp, &message)){
-        Serial.println("Error sending Email, " + smtp.errorReason());
-      }
-
-      delay(5000);
+      sendEmailFlag = true;
 
     }
     // //Log the CAN Bus message to the SD card
@@ -241,7 +249,6 @@ void MQTTConnect() {
     // Attempt to connect
     if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
-
       //Subscribe to the MQTT topic for this base station
       String topic = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
       mqttClient.subscribe(topic.c_str());
@@ -323,6 +330,141 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 
 }
 
+void setupEmail(){
+  smtp.debug(1);
+  // Set the callback function to get the sending results
+  smtp.callback(smtpCallback);
+
+  // Set the session config
+  config.server.host_name = SMTP_HOST;
+  config.server.port = SMTP_PORT;
+  config.login.email = AUTHOR_EMAIL;
+  config.login.password = AUTHOR_PASSWORD;
+
+  // Set the secure mode
+  config.secure.mode = esp_mail_secure_mode_ssl_tls;
+
+  // Set the NTP config time
+  config.time.ntp_server = ntpServer;
+  config.time.gmt_offset = gmtOffset_sec;
+  config.time.day_light_offset = daylightOffset_sec;
+
+  if (!smtp.connect(&config))
+  {
+    MailClient.printf("Connection error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
+    return;
+  }
+
+  emailQueue = xQueueCreate(10, sizeof(SMTP_Message));
+
+}
+
+void sendEmail(){
+
+  /* Declare the message class */
+  SMTP_Message message;
+
+  /* Set the message headers */
+  message.sender.name = F("Me (我)");
+  message.sender.email = AUTHOR_EMAIL;
+
+  /** If author and sender are not identical
+  message.sender.name = F("Sender");
+  message.sender.email = "sender@mail.com";
+  message.author.name = F("ESP Mail");
+  message.author.email = AUTHOR_EMAIL; // should be the same email as config.login.email
+ */
+
+  // In case of sending non-ASCII characters in message envelope,
+  // that non-ASCII words should be encoded with proper charsets and encodings
+  // in form of `encoded-words` per RFC2047
+  // https://datatracker.ietf.org/doc/html/rfc2047
+
+  String subject = "Test sending a message (メッセージの送信をテストする)";
+  message.subject = subject;
+
+  message.addRecipient(F("Someone (誰か)"), RECIPIENT_EMAIL);
+
+  String textMsg = "This is simple plain text message which contains Chinese and Japanese words.\n";
+
+  message.text.content = textMsg;
+
+  /** The content transfer encoding e.g.
+   * enc_7bit or "7bit" (not encoded)
+   * enc_qp or "quoted-printable" (encoded)
+   * enc_base64 or "base64" (encoded)
+   * enc_binary or "binary" (not encoded)
+   * enc_8bit or "8bit" (not encoded)
+   * The default value is "7bit"
+   */
+
+  message.text.transfer_encoding = "base64"; // recommend for non-ASCII words in message.
+  message.text.charSet = F("utf-8"); // recommend for non-ASCII words in message.
+  message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_low;
+
+  // message.response.reply_to = "someone@somemail.com";
+  // message.response.return_path = "someone@somemail.com";
+
+  /** The Delivery Status Notifications e.g.
+   * esp_mail_smtp_notify_never
+   * esp_mail_smtp_notify_success
+   * esp_mail_smtp_notify_failure
+   * esp_mail_smtp_notify_delay
+   * The default value is esp_mail_smtp_notify_never
+   */
+  // message.response.notify = esp_mail_smtp_notify_success | esp_mail_smtp_notify_failure | esp_mail_smtp_notify_delay;
+
+  /* Set the custom message header */
+  //message.addHeader(F("Message-ID: <abcde.fghij@gmail.com>"));
+
+  // For Root CA certificate verification (ESP8266 and ESP32 only)
+  // config.certificate.cert_data = rootCACert;
+  // or
+  // config.certificate.cert_file = "/path/to/der/file";
+  // config.certificate.cert_file_storage_type = esp_mail_file_storage_type_flash; // esp_mail_file_storage_type_sd
+  // config.certificate.verify = true;
+
+  // The WiFiNINA firmware the Root CA certification can be added via the option in Firmware update tool in Arduino IDE
+
+  /* Connect to server with the session config */
+
+  // Library will be trying to sync the time with NTP server if time is never sync or set.
+  // This is 10 seconds blocking process.
+  // If time reading was timed out, the error "NTP server time reading timed out" will show via debug and callback function.
+  // You can manually sync time by yourself with NTP library or calling configTime in ESP32 and ESP8266.
+  // Time can be set manually with provided timestamp to function smtp.setSystemTime.
+
+  /* Set the TCP response read timeout in seconds */
+  // smtp.setTCPTimeout(10);
+
+  /* Connect to the server */
+
+
+  /** Or connect without log in and log in later
+
+     if (!smtp.connect(&config, false))
+       return;
+
+     if (!smtp.loginWithPassword(AUTHOR_EMAIL, AUTHOR_PASSWORD))
+       return;
+  */
+
+  if (!smtp.isLoggedIn())
+  {
+    Serial.println("Not yet logged in.");
+  }
+  else
+  {
+    if (smtp.isAuthenticated())
+      Serial.println("Successfully logged in.");
+    else
+      Serial.println("Connected with no Auth.");
+  }
+
+  /* Start sending Email and close the session */
+  if (!MailClient.sendMail(&smtp, &message,false))
+    MailClient.printf("Error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
+}
 
 void setup() {
     //Start the serial connection
@@ -330,7 +472,12 @@ void setup() {
 
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
-    WiFi.begin("IoT-Security", "B@kery204!");
+    WiFi.begin("White Rabbit", "2511560A7196");
+
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
 
     Serial.println("");
     Serial.println("WiFi connected");
@@ -401,13 +548,6 @@ void setup() {
 
     //TODO: is this were we should start the Node Controller Core?
     // Start the Node Controller
-    core = NodeControllerCore();
-    if(core.Init(receivedCANBUSMessage, 0x00)){
-        Serial.println("Node Controller Core Started");
-    } else {
-        Serial.println("Node Controller Core Failed to Start");
-    }
-
     //Set the WiFi client to use the CA certificate from HiveMQ
     //Got it from here: https://community.hivemq.com/t/frequently-asked-questions-hivemq-cloud/514
     espClient.setCACert(CA_cert);  
@@ -421,27 +561,68 @@ void setup() {
     //TODO: Add a check to see if the SD card is still mounted, if not remount it
     //TODO: Add a check to see if the WiFi is still connected, if not reconnect
 
-    //Email
-    // Set the session config
-    config.server.host_name = "smtp.gmail.com"; // for outlook.com
-    config.server.port = 587; // for TLS with STARTTLS or 25 (Plain/TLS with STARTTLS) or 465 (SSL)
-    config.login.email = "projectfishworks@gmail.com"; // set to empty for no SMTP Authentication
-    config.login.password = "ylgrybcjdlkbzsin"; // set to empty for no SMTP Authentication
+    /** Enable the debug via Serial port
+   * 0 for no debugging
+   * 1 for basic level debugging
+   *
+   * Debug port can be changed via ESP_MAIL_DEFAULT_DEBUG_PORT in ESP_Mail_FS.h
+   */
+  
+  // to clear sending result log
+  // smtp.sendingResult.clear();
+    //sendEmail();
 
-    config.time.ntp_server = "pool.ntp.org,time.nist.gov";
-    config.time.gmt_offset = 3;
-    config.time.day_light_offset = 0;
+    //Start the Node Controller Core
+    setupEmail();
+
+    core = NodeControllerCore();
+    if(core.Init(receivedCANBUSMessage, 0x00)){
+        Serial.println("Node Controller Core Started");
+    } else {
+        Serial.println("Node Controller Core Failed to Start");
+    }
+
 
 }
 
+/* Callback function to get the Email sending status */
 void smtpCallback(SMTP_Status status)
 {
- 
+  /* Print the current status */
   Serial.println(status.info());
 
+  /* Print the sending result */
   if (status.success())
   {
-    // See example for how to get the sending result
+    // MailClient.printf used in the examples is for format printing via debug Serial port
+    // that works for all supported Arduino platform SDKs e.g. SAMD, ESP32 and ESP8266.
+    // In ESP8266 and ESP32, you can use Serial.printf directly.
+
+    Serial.println("----------------");
+    MailClient.printf("Message sent success: %d\n", status.completedCount());
+    MailClient.printf("Message sent failed: %d\n", status.failedCount());
+    Serial.println("----------------\n");
+
+    for (size_t i = 0; i < smtp.sendingResult.size(); i++)
+    {
+      /* Get the result item */
+      SMTP_Result result = smtp.sendingResult.getItem(i);
+
+      // In case, ESP32, ESP8266 and SAMD device, the timestamp get from result.timestamp should be valid if
+      // your device time was synched with NTP server.
+      // Other devices may show invalid timestamp as the device time was not set i.e. it will show Jan 1, 1970.
+      // You can call smtp.setSystemTime(xxx) to set device time manually. Where xxx is timestamp (seconds since Jan 1, 1970)
+
+      MailClient.printf("Message No: %d\n", i + 1);
+      MailClient.printf("Status: %s\n", result.completed ? "success" : "failed");
+      MailClient.printf("Date/Time: %s\n", MailClient.Time.getDateTimeString(result.timestamp, "%B %d, %Y %H:%M:%S").c_str());
+      MailClient.printf("Recipient: %s\n", result.recipients.c_str());
+      MailClient.printf("Subject: %s\n", result.subject.c_str());
+    }
+    Serial.println("----------------\n");
+
+    // You need to clear sending result as the memory usage will grow up.
+    smtp.sendingResult.clear();
   }
 }
 
@@ -452,5 +633,11 @@ void loop() {
     if (!mqttClient.connected()) {
         MQTTConnect();
     }
-    mqttClient.loop();   
+    mqttClient.loop();
+
+    if(sendEmailFlag) {
+        //setupEmail();
+        sendEmail();
+        sendEmailFlag = false;
+    }   
 }
