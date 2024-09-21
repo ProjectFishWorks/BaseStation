@@ -23,6 +23,13 @@
 
 bool sendEmailFlag = false;
 
+struct AlertData
+{
+  uint8_t nodeID;
+  uint8_t isWarning;
+};
+
+
 QueueHandle_t emailQueue;
 
 /** For Gmail, the app password will be used for log in
@@ -209,10 +216,16 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
 
     //Check for alerts and warnings
     if(messageID == WARN_ID || messageID == ALERT_ID) {
-      Serial.println("Alert or Warning message received");
-      Serial.println("Sending email");
-      //Send an email
-      sendEmailFlag = true;
+      if(data != 0){
+        Serial.println("Alert or Warning message received");
+        Serial.println("Sending email");
+        AlertData alertData;
+        alertData.nodeID = nodeID;
+        alertData.isWarning = messageID == WARN_ID ? 1 : 0;
+        //Send an email
+        //sendEmailFlag = true;
+        xQueueSend(emailQueue, &alertData, portMAX_DELAY);
+      }
 
     }
     // //Log the CAN Bus message to the SD card
@@ -355,99 +368,51 @@ void setupEmail(){
     return;
   }
 
-  emailQueue = xQueueCreate(10, sizeof(SMTP_Message));
+  emailQueue = xQueueCreate(10, sizeof(AlertData));
 
 }
 
-void sendEmail(){
+void sendEmail(AlertData *data){
 
-  /* Declare the message class */
-  SMTP_Message message;
+      /* Declare the message class */
+      SMTP_Message message;
 
-  /* Set the message headers */
-  message.sender.name = F("Me (我)");
-  message.sender.email = AUTHOR_EMAIL;
+      /* Set the message headers */
+      message.sender.name = F("Project FishWorks Base Station");
+      message.sender.email = AUTHOR_EMAIL;
 
-  /** If author and sender are not identical
-  message.sender.name = F("Sender");
-  message.sender.email = "sender@mail.com";
-  message.author.name = F("ESP Mail");
-  message.author.email = AUTHOR_EMAIL; // should be the same email as config.login.email
- */
+      /** If author and sender are not identical
+      message.sender.name = F("Sender");
+      message.sender.email = "sender@mail.com";
+      message.author.name = F("ESP Mail");
+      message.author.email = AUTHOR_EMAIL; // should be the same email as config.login.email
+    */
 
-  // In case of sending non-ASCII characters in message envelope,
-  // that non-ASCII words should be encoded with proper charsets and encodings
-  // in form of `encoded-words` per RFC2047
-  // https://datatracker.ietf.org/doc/html/rfc2047
+      // In case of sending non-ASCII characters in message envelope,
+      // that non-ASCII words should be encoded with proper charsets and encodings
+      // in form of `encoded-words` per RFC2047
+      // https://datatracker.ietf.org/doc/html/rfc2047
 
-  String subject = "Test sending a message (メッセージの送信をテストする)";
-  message.subject = subject;
+      struct tm timeinfo;
+      getLocalTime(&timeinfo);
+      char locTime[9];
+      sprintf(locTime, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+      if(data->isWarning){
+        message.subject = "WARNING Project FishWorks - Node " + String(data->nodeID);
+        message.text.content = "Warning message received from Node " + String(data->nodeID) + " at " + String(locTime) +" UTC\n Please check the web app for more details.";
+      } else {
+        message.subject = "---ALERT--- Project FishWorks - Node " + String(data->nodeID);
+        message.text.content = "Alert message received from Node " + String(data->nodeID) + " at " + String(locTime) +" UTC\n Please check the web app for more details.";
+      }
 
-  message.addRecipient(F("Someone (誰か)"), RECIPIENT_EMAIL);
+      message.addRecipient(F("User"), RECIPIENT_EMAIL);
+      message.addRecipient(F("User"), "kayleb_s@hotmail.com");
+      message.addRecipient(F("User"), "triggbraden@yahoo.ca");
+      message.addRecipient(F("User"), "eric.samer@gmail.com");
 
-  String textMsg = "This is simple plain text message which contains Chinese and Japanese words.\n";
-
-  message.text.content = textMsg;
-
-  /** The content transfer encoding e.g.
-   * enc_7bit or "7bit" (not encoded)
-   * enc_qp or "quoted-printable" (encoded)
-   * enc_base64 or "base64" (encoded)
-   * enc_binary or "binary" (not encoded)
-   * enc_8bit or "8bit" (not encoded)
-   * The default value is "7bit"
-   */
-
-  message.text.transfer_encoding = "base64"; // recommend for non-ASCII words in message.
-  message.text.charSet = F("utf-8"); // recommend for non-ASCII words in message.
-  message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_low;
-
-  // message.response.reply_to = "someone@somemail.com";
-  // message.response.return_path = "someone@somemail.com";
-
-  /** The Delivery Status Notifications e.g.
-   * esp_mail_smtp_notify_never
-   * esp_mail_smtp_notify_success
-   * esp_mail_smtp_notify_failure
-   * esp_mail_smtp_notify_delay
-   * The default value is esp_mail_smtp_notify_never
-   */
-  // message.response.notify = esp_mail_smtp_notify_success | esp_mail_smtp_notify_failure | esp_mail_smtp_notify_delay;
-
-  /* Set the custom message header */
-  //message.addHeader(F("Message-ID: <abcde.fghij@gmail.com>"));
-
-  // For Root CA certificate verification (ESP8266 and ESP32 only)
-  // config.certificate.cert_data = rootCACert;
-  // or
-  // config.certificate.cert_file = "/path/to/der/file";
-  // config.certificate.cert_file_storage_type = esp_mail_file_storage_type_flash; // esp_mail_file_storage_type_sd
-  // config.certificate.verify = true;
-
-  // The WiFiNINA firmware the Root CA certification can be added via the option in Firmware update tool in Arduino IDE
-
-  /* Connect to server with the session config */
-
-  // Library will be trying to sync the time with NTP server if time is never sync or set.
-  // This is 10 seconds blocking process.
-  // If time reading was timed out, the error "NTP server time reading timed out" will show via debug and callback function.
-  // You can manually sync time by yourself with NTP library or calling configTime in ESP32 and ESP8266.
-  // Time can be set manually with provided timestamp to function smtp.setSystemTime.
-
-  /* Set the TCP response read timeout in seconds */
-  // smtp.setTCPTimeout(10);
-
-  /* Connect to the server */
-
-
-  /** Or connect without log in and log in later
-
-     if (!smtp.connect(&config, false))
-       return;
-
-     if (!smtp.loginWithPassword(AUTHOR_EMAIL, AUTHOR_PASSWORD))
-       return;
-  */
+      message.text.transfer_encoding = "base64"; // recommend for non-ASCII words in message.
+      message.text.charSet = F("utf-8"); // recommend for non-ASCII words in message.
+      message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_low;
 
   if (!smtp.isLoggedIn())
   {
@@ -635,9 +600,9 @@ void loop() {
     }
     mqttClient.loop();
 
-    if(sendEmailFlag) {
-        //setupEmail();
-        sendEmail();
-        sendEmailFlag = false;
-    }   
+    AlertData alertData;
+    if(xQueueReceive(emailQueue, &alertData, portMAX_DELAY) == pdTRUE) {
+      Serial.println("Sending email from queue");
+      sendEmail(&alertData);
+    }
 }
