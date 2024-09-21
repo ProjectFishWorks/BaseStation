@@ -18,39 +18,24 @@
 
 #include <ArduinoJson.h>
 
-//Email
+//---------------Email-------------------
 #include <ESP_Mail_Client.h>
 
-bool sendEmailFlag = false;
-
+//Struct to hold data for email alerts
 struct AlertData
 {
   uint8_t nodeID;
   uint8_t isWarning;
 };
 
-
 QueueHandle_t emailQueue;
 
-/** For Gmail, the app password will be used for log in
- *  Check out https://github.com/mobizt/ESP-Mail-Client#gmail-smtp-and-imap-required-app-passwords-to-sign-in
- *
- * For Yahoo mail, log in to your yahoo mail in web browser and generate app password by go to
- * https://login.yahoo.com/account/security/app-passwords/add/confirm?src=noSrc
- *
- * To use Gmai and Yahoo's App Password to sign in, define the AUTHOR_PASSWORD with your App Password
- * and AUTHOR_EMAIL with your account email.
- */
+#define EMAIL_QUEUE_LENGTH 10
 
 /** The smtp host name e.g. smtp.gmail.com for GMail or smtp.office365.com for Outlook or smtp.mail.yahoo.com */
 #define SMTP_HOST "smtp.gmail.com"
 
-/** The smtp port e.g.
- * 25  or esp_mail_smtp_port_25
- * 465 or esp_mail_smtp_port_465
- * 587 or esp_mail_smtp_port_587
- */
-#define SMTP_PORT esp_mail_smtp_port_465 // port 465 is not available for Outlook.com
+#define SMTP_PORT esp_mail_smtp_port_465
 
 /* The log in credentials */
 #define AUTHOR_EMAIL "projectfishworks@gmail.com"
@@ -62,18 +47,18 @@ QueueHandle_t emailQueue;
 /* Declare the global used SMTPSession object for SMTP transport */
 SMTPSession smtp;
 
-/* Callback function to get the Email sending status */
-void smtpCallback(SMTP_Status status);
-
-void sendEmail();
-void setupEmail();
-
 // Declare the global used Session_Config for user defined session credentials
 Session_Config config;
+
+//Sends email based on the contents of the AlertData
+void sendEmail(AlertData *data);
 
 // Callback function to get the Email sending status
 void smtpCallback(SMTP_Status status);
 
+//--------------------------------------
+
+//CAN Bus message IDs for warnings and alerts
 #define WARN_ID 0x384 //900
 #define ALERT_ID 0x385 //901
 
@@ -216,18 +201,21 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
 
     //Check for alerts and warnings
     if(messageID == WARN_ID || messageID == ALERT_ID) {
+      //Only send an email if the alrt or warning message being turned on
       if(data != 0){
-        Serial.println("Alert or Warning message received");
-        Serial.println("Sending email");
+        Serial.println("Alert or Warning message received!!");
+
+        //Send to email queue
         AlertData alertData;
         alertData.nodeID = nodeID;
         alertData.isWarning = messageID == WARN_ID ? 1 : 0;
-        //Send an email
-        //sendEmailFlag = true;
         xQueueSend(emailQueue, &alertData, portMAX_DELAY);
       }
 
+      //TODO: Trigger hardware alert on the base station
+
     }
+
     // //Log the CAN Bus message to the SD card
 
     // //Create the log data row
@@ -343,35 +331,6 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 
 }
 
-void setupEmail(){
-  smtp.debug(1);
-  // Set the callback function to get the sending results
-  smtp.callback(smtpCallback);
-
-  // Set the session config
-  config.server.host_name = SMTP_HOST;
-  config.server.port = SMTP_PORT;
-  config.login.email = AUTHOR_EMAIL;
-  config.login.password = AUTHOR_PASSWORD;
-
-  // Set the secure mode
-  config.secure.mode = esp_mail_secure_mode_ssl_tls;
-
-  // Set the NTP config time
-  config.time.ntp_server = ntpServer;
-  config.time.gmt_offset = gmtOffset_sec;
-  config.time.day_light_offset = daylightOffset_sec;
-
-  if (!smtp.connect(&config))
-  {
-    MailClient.printf("Connection error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
-    return;
-  }
-
-  emailQueue = xQueueCreate(10, sizeof(AlertData));
-
-}
-
 void sendEmail(AlertData *data){
 
       /* Declare the message class */
@@ -381,22 +340,18 @@ void sendEmail(AlertData *data){
       message.sender.name = F("Project FishWorks Base Station");
       message.sender.email = AUTHOR_EMAIL;
 
-      /** If author and sender are not identical
-      message.sender.name = F("Sender");
-      message.sender.email = "sender@mail.com";
-      message.author.name = F("ESP Mail");
-      message.author.email = AUTHOR_EMAIL; // should be the same email as config.login.email
-    */
-
       // In case of sending non-ASCII characters in message envelope,
       // that non-ASCII words should be encoded with proper charsets and encodings
       // in form of `encoded-words` per RFC2047
       // https://datatracker.ietf.org/doc/html/rfc2047
 
+      //Get the current time
       struct tm timeinfo;
       getLocalTime(&timeinfo);
       char locTime[9];
       sprintf(locTime, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+
+      //Set the subject and content of the email
       if(data->isWarning){
         message.subject = "WARNING Project FishWorks - Node " + String(data->nodeID);
         message.text.content = "Warning message received from Node " + String(data->nodeID) + " at " + String(locTime) +" UTC\n Please check the web app for more details.";
@@ -406,29 +361,26 @@ void sendEmail(AlertData *data){
       }
 
       message.addRecipient(F("User"), RECIPIENT_EMAIL);
-      message.addRecipient(F("User"), "kayleb_s@hotmail.com");
-      message.addRecipient(F("User"), "triggbraden@yahoo.ca");
-      message.addRecipient(F("User"), "eric.samer@gmail.com");
 
       message.text.transfer_encoding = "base64"; // recommend for non-ASCII words in message.
       message.text.charSet = F("utf-8"); // recommend for non-ASCII words in message.
       message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_low;
 
-  if (!smtp.isLoggedIn())
-  {
-    Serial.println("Not yet logged in.");
-  }
-  else
-  {
-    if (smtp.isAuthenticated())
-      Serial.println("Successfully logged in.");
-    else
-      Serial.println("Connected with no Auth.");
-  }
+      if (!smtp.isLoggedIn())
+      {
+        Serial.println("Not yet logged in.");
+      }
+      else
+      {
+        if (smtp.isAuthenticated())
+          Serial.println("Successfully logged in.");
+        else
+          Serial.println("Connected with no Auth.");
+      }
 
-  /* Start sending Email and close the session */
-  if (!MailClient.sendMail(&smtp, &message,false))
-    MailClient.printf("Error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
+      // Start sending Email
+      if (!MailClient.sendMail(&smtp, &message,false))
+        MailClient.printf("Error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
 }
 
 void setup() {
@@ -526,20 +478,36 @@ void setup() {
     //TODO: Add a check to see if the SD card is still mounted, if not remount it
     //TODO: Add a check to see if the WiFi is still connected, if not reconnect
 
-    /** Enable the debug via Serial port
-   * 0 for no debugging
-   * 1 for basic level debugging
-   *
-   * Debug port can be changed via ESP_MAIL_DEFAULT_DEBUG_PORT in ESP_Mail_FS.h
-   */
-  
-  // to clear sending result log
-  // smtp.sendingResult.clear();
-    //sendEmail();
+
+    //Set the email client
+    smtp.debug(1);
+    // Set the callback function to get the sending results
+    smtp.callback(smtpCallback);
+
+    // Set the session config
+    config.server.host_name = SMTP_HOST;
+    config.server.port = SMTP_PORT;
+    config.login.email = AUTHOR_EMAIL;
+    config.login.password = AUTHOR_PASSWORD;
+
+    // Set the secure mode
+    config.secure.mode = esp_mail_secure_mode_ssl_tls;
+
+    // Set the NTP config time
+    config.time.ntp_server = ntpServer;
+    config.time.gmt_offset = gmtOffset_sec;
+    config.time.day_light_offset = daylightOffset_sec;
+
+    if (!smtp.connect(&config))
+    {
+      MailClient.printf("Connection error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
+      return;
+    }
+
+    emailQueue = xQueueCreate(EMAIL_QUEUE_LENGTH, sizeof(AlertData));
+
 
     //Start the Node Controller Core
-    setupEmail();
-
     core = NodeControllerCore();
     if(core.Init(receivedCANBUSMessage, 0x00)){
         Serial.println("Node Controller Core Started");
@@ -600,9 +568,9 @@ void loop() {
     }
     mqttClient.loop();
 
+    //Check the email queue for messages to send
     AlertData alertData;
     if(xQueueReceive(emailQueue, &alertData, portMAX_DELAY) == pdTRUE) {
-      Serial.println("Sending email from queue");
       sendEmail(&alertData);
     }
 }
