@@ -7,7 +7,8 @@
 
 #include "credential.h"
 
-#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+#include <WiFi.h>
+//#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 
 #include "WiFiClientSecure.h"
 
@@ -19,6 +20,7 @@
 
 //Email
 #include <ESP_Mail_Client.h>
+
 // Declare the global used SMTPSession object for SMTP transport
 SMTPSession smtp;
 
@@ -175,9 +177,10 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
       //Send an email
       SMTP_Message message;
       // Set the message headers
-      message.sender.name = "My Mail";
+      // Set the message headers
+      message.sender.name = "Base Station";
       message.sender.email = "projectfishworks@gmail.com";
-      message.subject = "Alert from Project Fish Works Base Station";
+      message.subject = "Test sending Email";
       message.addRecipient("Sebastien Robitaille", "sebastien@robitaille.info");
 
       // Set the message content
@@ -189,33 +192,39 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
       // Set the callback function to get the sending results
       smtp.callback(smtpCallback);
 
+      Serial.println("Email ready to send");
+
       // Connect to the server
       smtp.connect(&config);
+
+      Serial.println("Connected to SMTP server");
 
       // Start sending Email and close the session
       if (!MailClient.sendMail(&smtp, &message)){
         Serial.println("Error sending Email, " + smtp.errorReason());
       }
 
+      delay(5000);
+
     }
-    //Log the CAN Bus message to the SD card
+    // //Log the CAN Bus message to the SD card
 
-    //Create the log data row
-    String logData = getLogDataRow(NULL, nodeID, messageID, data);
+    // //Create the log data row
+    // String logData = getLogDataRow(NULL, nodeID, messageID, data);
 
-    File logFile;
-    char filename[255];
-    getCurrentLogFilename(filename);
-    //For when we get the log file queue working, for now just write directly to the file
-    //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
+    // File logFile;
+    // char filename[255];
+    // getCurrentLogFilename(filename);
+    // //For when we get the log file queue working, for now just write directly to the file
+    // //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
 
-    //Open the log file
-    openLogFile(&logFile);
-    //Write the log data row to the log file
-    logFile.println(logData);
-    Serial.println("Wrote to log file : " + logData);
-    //Close the log file
-    logFile.close();
+    // //Open the log file
+    // openLogFile(&logFile);
+    // //Write the log data row to the log file
+    // logFile.println(logData);
+    // Serial.println("Wrote to log file : " + logData);
+    // //Close the log file
+    // logFile.close();
 
 }
 
@@ -300,16 +309,16 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   //Log the message to the SD card
 
   //Create the log data row
-  String logData = getLogDataRow(NULL, nodeID, messageID, data);
-  File logFile;
-  char filename[255];
-  getCurrentLogFilename(filename);
-  //TODO: For when we get the log file queue working, for now just write directly to the file
-  //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
-  openLogFile(&logFile);
-  logFile.println(logData);
-  Serial.println("Wrote to log file : " + logData);
-  logFile.close();
+  // String logData = getLogDataRow(NULL, nodeID, messageID, data);
+  // File logFile;
+  // char filename[255];
+  // getCurrentLogFilename(filename);
+  // //TODO: For when we get the log file queue working, for now just write directly to the file
+  // //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
+  // openLogFile(&logFile);
+  // logFile.println(logData);
+  // Serial.println("Wrote to log file : " + logData);
+  // logFile.close();
   
 
 }
@@ -320,9 +329,16 @@ void setup() {
     Serial.begin(115200);
 
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
+    WiFi.begin("IoT-Security", "B@kery204!");
+
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
     
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
-    WiFiManager wm;
+    //WiFiManager wm;
 
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
@@ -333,7 +349,7 @@ void setup() {
     // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
     // then goes into a blocking loop awaiting configuration and will return success result
 
-    bool res;
+   /*  bool res;
     //TODO generate a unique name for the base station based on the system ID and base station ID
     res = wm.autoConnect("Project Fish Works Base Station");
     if(!res) {
@@ -346,38 +362,38 @@ void setup() {
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
-    }
+    } */
 
     // Start the NTP Client
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
-    //Mount the SD Card
-    SPI.begin(sck, miso, mosi, cs);
-    if (!SD.begin(cs)) {
-        Serial.println("Card Mount Failed");
-    }else{
-        Serial.println("Card Mount Success");
-    }
-    uint8_t cardType = SD.cardType();
+    // //Mount the SD Card
+    // SPI.begin(sck, miso, mosi, cs);
+    // if (!SD.begin(cs)) {
+    //     Serial.println("Card Mount Failed");
+    // }else{
+    //     Serial.println("Card Mount Success");
+    // }
+    // uint8_t cardType = SD.cardType();
 
-    if (cardType == CARD_NONE) {
-      Serial.println("No SD card attached");
-      return;
-    }
+    // if (cardType == CARD_NONE) {
+    //   Serial.println("No SD card attached");
+    //   return;
+    // }
 
-    Serial.print("SD Card Type: ");
-    if (cardType == CARD_MMC) {
-      Serial.println("MMC");
-    } else if (cardType == CARD_SD) {
-      Serial.println("SDSC");
-    } else if (cardType == CARD_SDHC) {
-      Serial.println("SDHC");
-    } else {
-      Serial.println("UNKNOWN");
-    }
+    // Serial.print("SD Card Type: ");
+    // if (cardType == CARD_MMC) {
+    //   Serial.println("MMC");
+    // } else if (cardType == CARD_SD) {
+    //   Serial.println("SDSC");
+    // } else if (cardType == CARD_SDHC) {
+    //   Serial.println("SDHC");
+    // } else {
+    //   Serial.println("UNKNOWN");
+    // }
 
-    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-    Serial.printf("SD Card Size: %lluMB\n", cardSize);
+    // uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+    // Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
     //TODO: For when we get the log file queue working
     //log_file_queue = xQueueCreate(LOG_FILE_QUEUE_LENGTH, sizeof(String));
@@ -408,12 +424,12 @@ void setup() {
     //Email
     // Set the session config
     config.server.host_name = "smtp.gmail.com"; // for outlook.com
-    config.server.port = 465; // for TLS with STARTTLS or 25 (Plain/TLS with STARTTLS) or 465 (SSL)
-    config.login.email = "projectfishoworks@gmail.com"; // set to empty for no SMTP Authentication
-    config.login.password = "jsrx dxdw each ebfc"; // set to empty for no SMTP Authentication
+    config.server.port = 587; // for TLS with STARTTLS or 25 (Plain/TLS with STARTTLS) or 465 (SSL)
+    config.login.email = "projectfishworks@gmail.com"; // set to empty for no SMTP Authentication
+    config.login.password = "ylgrybcjdlkbzsin"; // set to empty for no SMTP Authentication
 
     config.time.ntp_server = "pool.ntp.org,time.nist.gov";
-    config.time.gmt_offset = 0;
+    config.time.gmt_offset = 3;
     config.time.day_light_offset = 0;
 
 }
