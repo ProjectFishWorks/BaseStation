@@ -14,7 +14,7 @@ void sendEmailToQueue(AlertData *data){
 
 void emailClientLoop(){
     AlertData alertData;
-    if(xQueueReceive(emailQueue, &alertData, portMAX_DELAY) == pdTRUE) {
+    if(xQueueReceive(emailQueue, &alertData, 1) == pdTRUE) {
       sendEmail(&alertData);
     }
 }
