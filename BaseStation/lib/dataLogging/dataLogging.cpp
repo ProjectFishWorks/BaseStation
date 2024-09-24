@@ -47,20 +47,89 @@ void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationF
   // Serial.println("Wrote to log file : " + logData);
   logFile.close();
 }
-//Get the current log file name based on the current time
-//Currently creates one log file per hour
-void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID) {
+
+uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hourseToRead, JsonDocument *doc) {
+  
+  for(uint16_t i = 0; i < hourseToRead; i ++){
+    char filename[255];
+
+    time_t now;
+    time(&now);
+
+    now -= i * 3600;
+
+    char line[MAX_LOG_FILE_LINE_LENGTH];
+
+    char field[255];
+
+    File logFile;
+
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+
+    getLogFilename(filename, systemID, baseStationID, timeinfo);
+
+    if(SD.exists(filename)) {
+      logFile = SD.open(filename, FILE_READ);
+      Serial.println("Opened log file: " + String(filename));
+      //Skip the header rows
+      for(uint8_t i = 0; i < LOG_FILE_HEADER_ROW_COUNT; i++){
+        logFile.readStringUntil('\n');
+      }
+      while(logFile.available()){
+        uint64_t time = 0;
+        uint32_t nodeID = 0;
+        uint32_t messageID = 0;
+        uint64_t data = 0;
+        Serial.println("Reading log file line");
+        logFile.readBytesUntil(',', field, 255);
+        time = strtoull(field, NULL, 0);
+        logFile.readBytesUntil(',', field, 255);
+        nodeID = strtoul(field, NULL, 0);
+        logFile.readBytesUntil(',', field, 255);
+        messageID = strtoul(field, NULL, 0);
+        logFile.readBytesUntil('\n', field, 255);
+        data = strtoull(field, NULL, 0);
+        Serial.println("Got log data row");
+        Serial.println("Time:" + String(time) + " NodeID: " + String(nodeID) + " MessageID: " + String(messageID) + " Data: " + String(data));
+      }
+    }
+  }
+  //return 1;
+
+}
+
+bool parseLogDataRow(char* line, uint64_t *time, uint32_t* nodeID, uint32_t* messageID, uint64_t* data) {
+  Serial.println("Parsing log data row: ");
+  Serial.println(line);
+  char* ptr;
+  ptr = strtok(line, ",");
+  if (!line){return false;}
+  *time = strtoull(line, &ptr, 0);
+  Serial.println("Got time");
+  Serial.println(line);
+  ptr = strtok(NULL, ",");
+  // if (!line){return false;}
+  *nodeID = strtoul(line, &ptr, 0);
+  Serial.println("Got nodeID");
+  Serial.println(line);
+
+  // ptr = strtok(NULL, ",");
+  // if (!line){return false;}
+  // *messageID = strtoul(line, &ptr, 0);
+  // Serial.println("Got messageID");
+
+  // ptr = strtok(NULL, ",");
+  // if (!line){return false;}
+  // *data = strtoull(line, &ptr, 0);
+  // Serial.println("Got data");
+  return true;
+}
+
+void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, tm timeinfo){
+
   //Buffer to hold the current date/time
   char timeString[255];
-  //Time object
-  struct tm timeinfo;
-  //If we can't get the current time, add a default filename
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time!");
-    strcpy(filename, "log-no-time.csv");
-    return;
-  }
-  
   //Format the data/time
   strftime(timeString, 255, "-%Y-%m-%d-%H.csv", &timeinfo);
 
@@ -69,6 +138,22 @@ void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStati
 
   //Copy the final string to the filename pointer
   filenameString.toCharArray(filename, filenameString.length() + 1);
+
+}
+//Get the current log file name based on the current time
+//Currently creates one log file per hour
+void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID) {
+  //Time object
+  struct tm timeinfo;
+  //If we can't get the current time, add a default filename
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time!");
+    strcpy(filename, "log-no-time.csv");
+    return;
+  }
+
+  getLogFilename(filename, systemID, baseStationID, timeinfo);
+  
 }
 
 //Write the header info to the log file

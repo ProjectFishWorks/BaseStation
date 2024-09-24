@@ -196,8 +196,8 @@ void setup() {
 
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
-    //WiFi.begin("White Rabbit", "2511560A7196");
-    WiFi.begin("IoT-Security", "B@kery204!");
+    WiFi.begin("White Rabbit", "2511560A7196");
+    //WiFi.begin("IoT-Security", "B@kery204!");
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
@@ -261,6 +261,11 @@ void setup() {
     initSDCard();
 
     initEmailClient();
+
+    //SD read test
+    Serial.println("Reading log data");
+    JsonDocument doc;
+    readLogData(0, 0, 170, 45056, 1, &doc);
 
     //Start the Node Controller Core
     core = NodeControllerCore();
