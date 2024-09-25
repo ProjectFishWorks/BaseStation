@@ -8,7 +8,7 @@
 #include <ArduinoJson.h>
 
 //TODO: this can probably be shorter
-#define MAX_LOG_FILE_LINE_LENGTH 255
+#define MAX_LOG_FILE_FIELD_LENGTH 30
 
 #define LOG_FILE_HEADER_ROW_COUNT 5
 
@@ -26,7 +26,7 @@ void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationF
 
 uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hourseToRead, JsonDocument *doc);
 
-bool parseLogDataRow(char* line, uint64_t *time, uint32_t* nodeID, uint32_t* messageID, uint64_t* data);
+uint8_t parseLogDataField(File *file, char* field, size_t maxFieldLength);
 
 //Get the log file name based on the systemID, baseStationID, and timeinfo
 void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, tm timeinfo);

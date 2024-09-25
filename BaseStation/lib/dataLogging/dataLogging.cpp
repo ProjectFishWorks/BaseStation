@@ -48,9 +48,19 @@ void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationF
   logFile.close();
 }
 
-uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hourseToRead, JsonDocument *doc) {
+uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, JsonDocument *doc) {
   
-  for(uint16_t i = 0; i < hourseToRead; i ++){
+  
+  (*doc)["hours"] = hoursToRead;
+  (*doc)["systemID"] = systemID;
+  (*doc)["baseStationID"] = baseStationID;
+  (*doc)["nodeID"] = nodeID;
+  (*doc)["messageID"] = messageID;
+
+  JsonArray history = (*doc)["history"].to<JsonArray>();
+  for(uint16_t i = 0; i < hoursToRead; i++){
+
+    //Read historical log data from the SD card
     char filename[255];
 
     time_t now;
@@ -58,9 +68,7 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
 
     now -= i * 3600;
 
-    char line[MAX_LOG_FILE_LINE_LENGTH];
-
-    char field[255];
+    char field[MAX_LOG_FILE_FIELD_LENGTH];
 
     File logFile;
 
@@ -76,54 +84,54 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
       for(uint8_t i = 0; i < LOG_FILE_HEADER_ROW_COUNT; i++){
         logFile.readStringUntil('\n');
       }
+
       while(logFile.available()){
         uint64_t time = 0;
         uint32_t nodeID = 0;
         uint32_t messageID = 0;
         uint64_t data = 0;
-        Serial.println("Reading log file line");
-        logFile.readBytesUntil(',', field, 255);
-        time = strtoull(field, NULL, 0);
-        logFile.readBytesUntil(',', field, 255);
-        nodeID = strtoul(field, NULL, 0);
-        logFile.readBytesUntil(',', field, 255);
-        messageID = strtoul(field, NULL, 0);
-        logFile.readBytesUntil('\n', field, 255);
-        data = strtoull(field, NULL, 0);
-        Serial.println("Got log data row");
-        Serial.println("Time:" + String(time) + " NodeID: " + String(nodeID) + " MessageID: " + String(messageID) + " Data: " + String(data));
+        uint8_t fieldLength = 0;
+
+        parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
+        time = strtoull(field, NULL, 10);
+        parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
+        nodeID = strtoul(field, NULL, 10);
+        parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
+        messageID = strtoul(field, NULL, 10);
+        parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
+        data = strtoull(field, NULL, 10);
+
+        if(nodeID == nodeID && messageID == messageID){
+          JsonObject nestedObject = history.createNestedObject();
+          nestedObject["time"] = time;
+          nestedObject["data"] = data;
+        }
+
       }
     }
+    else{
+      Serial.println("Log file does not exist, skipping: " + String(filename));
+    }
   }
-  //return 1;
+  return 1;
 
 }
 
-bool parseLogDataRow(char* line, uint64_t *time, uint32_t* nodeID, uint32_t* messageID, uint64_t* data) {
-  Serial.println("Parsing log data row: ");
-  Serial.println(line);
-  char* ptr;
-  ptr = strtok(line, ",");
-  if (!line){return false;}
-  *time = strtoull(line, &ptr, 0);
-  Serial.println("Got time");
-  Serial.println(line);
-  ptr = strtok(NULL, ",");
-  // if (!line){return false;}
-  *nodeID = strtoul(line, &ptr, 0);
-  Serial.println("Got nodeID");
-  Serial.println(line);
-
-  // ptr = strtok(NULL, ",");
-  // if (!line){return false;}
-  // *messageID = strtoul(line, &ptr, 0);
-  // Serial.println("Got messageID");
-
-  // ptr = strtok(NULL, ",");
-  // if (!line){return false;}
-  // *data = strtoull(line, &ptr, 0);
-  // Serial.println("Got data");
-  return true;
+uint8_t parseLogDataField(File *file, char* field, size_t maxFieldLength) {
+  size_t n = 0;
+  char ch;
+  while((n+1) < maxFieldLength && file->readBytes(&ch,1) == 1) {
+    //Skip the carriage return
+    if(ch == '\r'){
+      continue;
+    }
+    field[n] = ch;
+    if(ch == ',' || ch == '\n'){
+      field[n] = '\0';
+      return n;
+    }
+    n++;
+  }
 }
 
 void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, tm timeinfo){
@@ -142,7 +150,7 @@ void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, t
 }
 //Get the current log file name based on the current time
 //Currently creates one log file per hour
-void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID) {
+void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID){
   //Time object
   struct tm timeinfo;
   //If we can't get the current time, add a default filename

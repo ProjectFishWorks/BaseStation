@@ -265,7 +265,9 @@ void setup() {
     //SD read test
     Serial.println("Reading log data");
     JsonDocument doc;
-    readLogData(0, 0, 170, 45056, 1, &doc);
+    readLogData(0, 0, 170, 45056, 12, &doc);
+
+    serializeJson(doc, Serial);
 
     //Start the Node Controller Core
     core = NodeControllerCore();
