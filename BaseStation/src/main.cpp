@@ -121,8 +121,10 @@ void MQTTConnect() {
     if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
       //Subscribe to the MQTT topic for this base station
-      String topic = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
-      mqttClient.subscribe(topic.c_str());
+      String topicIn = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
+      String topicHistory = "historyIn/" + String(systemID) + "/" + String(baseStationID) + "/#";
+      mqttClient.subscribe(topicIn.c_str());
+      mqttClient.subscribe(topicHistory.c_str());
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
@@ -147,12 +149,15 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   String topicString = String(topic);
   int index = 0;
   index = topicString.indexOf("/", index);
+  String type = topicString.substring(0, index);
   index = topicString.indexOf("/", index + 1);
   index = topicString.indexOf("/", index + 1);
   int nodeID = topicString.substring(index + 1, topicString.indexOf("/", index + 1)).toInt();
   index = topicString.indexOf("/", index + 1);
   int messageID = topicString.substring(index + 1, topicString.indexOf("/", index + 1)).toInt();
   
+  Serial.print("Type: ");
+  Serial.println(type);
   Serial.print("Node ID: ");
   Serial.println(nodeID);
   Serial.print("Message ID: ");
@@ -177,16 +182,33 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   Serial.print("Data: ");
   Serial.println(data);
 
-  //Set the node ID in the Node Controller Core to the node ID of the received message
-  //TODO: This is a workaround until we move the Node Controller Core code to the base station codebase
-  core.nodeID = nodeID;
+  //Regular message
+  if(type == "in"){
+    //Set the node ID in the Node Controller Core to the node ID of the received message
+    //TODO: This is a workaround until we move the Node Controller Core code to the base station codebase
+    core.nodeID = nodeID;
 
-  //Send the message to the CAN Bus
-  core.sendMessage(messageID, &data);
+    //Send the message to the CAN Bus
+    core.sendMessage(messageID, &data);
 
-  //Log the message to the SD card
+    //Log the message to the SD card
 
-  writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+    writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+
+  }
+  //History message
+  else if(type == "historyIn"){
+    Serial.println("History message received for node: " + String(nodeID) + " message: " + String(messageID) + "hours: " + String(data));
+    JsonDocument historyDoc;
+    readLogData(systemID, baseStationID, nodeID, messageID, data, &historyDoc);
+
+    //Create the MQTT topic string
+    String topic = "historyOut/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID);
+
+    //Send the message to the MQTT broker
+    mqttClient.publish(topic.c_str(), historyDoc.as<String>().c_str(), true);
+
+  }
 
 }
 
@@ -256,18 +278,14 @@ void setup() {
     //Set the MQTT callback function
     mqttClient.setCallback(receivedMQTTMessage);
 
+    //The max payload size we can send. This seems to be the max size you can use.
+    mqttClient.setBufferSize(34464);
+
     //TODO: Add a check to see if the SD card is still mounted, if not remount it
     //TODO: Add a check to see if the WiFi is still connected, if not reconnect
     initSDCard();
 
     initEmailClient();
-
-    //SD read test
-    Serial.println("Reading log data");
-    JsonDocument doc;
-    readLogData(0, 0, 170, 45056, 12, &doc);
-
-    serializeJson(doc, Serial);
 
     //Start the Node Controller Core
     core = NodeControllerCore();

@@ -86,24 +86,25 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
       }
 
       while(logFile.available()){
-        uint64_t time = 0;
-        uint32_t nodeID = 0;
-        uint32_t messageID = 0;
+        uint64_t dataTime = 0;
+        uint32_t dataNodeID = 0;
+        uint32_t dataMessageID = 0;
         uint64_t data = 0;
+
         uint8_t fieldLength = 0;
 
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
-        time = strtoull(field, NULL, 10);
+        dataTime = strtoull(field, NULL, 10);
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
-        nodeID = strtoul(field, NULL, 10);
+        dataNodeID = strtoul(field, NULL, 10);
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
-        messageID = strtoul(field, NULL, 10);
+        dataMessageID = strtoul(field, NULL, 10);
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
         data = strtoull(field, NULL, 10);
 
-        if(nodeID == nodeID && messageID == messageID){
+        if(dataNodeID == nodeID && dataMessageID == messageID){
           JsonObject nestedObject = history.createNestedObject();
-          nestedObject["time"] = time;
+          nestedObject["time"] = dataTime;
           nestedObject["data"] = data;
         }
 
