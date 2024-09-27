@@ -45,6 +45,8 @@ void initEmailClient(){
       return;
     }
 
+    smtp.keepAlive(5 /* tcp KeepAlive idle 5 seconds */, 5 /* tcp KeeAalive interval 5 seconds */, 1 /* tcp KeepAlive count 1 */);
+
     emailQueue = xQueueCreate(EMAIL_QUEUE_LENGTH, sizeof(AlertData));
 }
 
