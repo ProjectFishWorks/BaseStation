@@ -59,12 +59,20 @@ void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint
   uint64_t intervalStartTime = now - hoursToRead * 3600;
   doc.clear();
 
-  uint64_t currentHour = now;
+ time_t currentHour = now;
 
   while((currentHour) + 1 > intervalStartTime){
     readLogData(systemID, baseStationID, nodeID, messageID, currentHour, intervalStartTime, &doc);
     //Create the MQTT topic string
-    String topic = "historyOut/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID) + "/" + String(currentHour);
+    //Create the time portion of the topic
+    struct tm hour;
+    localtime_r(&currentHour, &hour);
+
+    char timeString[255];
+    //Format the data/time
+    strftime(timeString, 255, "%Y%m%d%H", &hour);
+
+    String topic = "historyOut/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID) + "/" + timeString;
     Serial.println("Sending log data to MQTT topic: " + topic);
     client->publish(topic.c_str(), doc.as<String>().c_str());
     doc.clear();

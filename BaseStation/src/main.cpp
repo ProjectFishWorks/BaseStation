@@ -39,7 +39,7 @@
 //TODO: add timezone support to WiFiManager
 #define ntpServer "pool.ntp.org"
 #define gmtOffset_sec 0
-#define daylightOffset_sec 3600
+#define daylightOffset_sec 0
 
 //Node Controller Core - temp usage coustom code for base station is created
 NodeControllerCore core;
