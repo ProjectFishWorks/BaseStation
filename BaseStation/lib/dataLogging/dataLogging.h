@@ -7,6 +7,8 @@
 
 #include <ArduinoJson.h>
 
+#include <PubSubClient.h>
+
 //TODO: this can probably be shorter
 #define MAX_LOG_FILE_FIELD_LENGTH 30
 
@@ -24,7 +26,7 @@ void initSDCard();
 //Write log data to the SD card, creating a new log file if needed
 void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationFirmwareVersion, uint8_t nodeID, uint16_t messageID, uint64_t data);
 
-uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hourseToRead, JsonDocument *doc);
+uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint64_t hourToRead, uint64_t intervalStartTime, JsonDocument *doc);
 
 uint8_t parseLogDataField(File *file, char* field, size_t maxFieldLength);
 
@@ -33,6 +35,8 @@ void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, t
 
 //Get the current log file name based on the current time
 void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID);
+
+void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, PubSubClient* client);
 
 //Write the log file header
 void writeLogHeader(File *file, uint16_t systemID, uint16_t baseStationID, String baseStationFirmwareVersion);

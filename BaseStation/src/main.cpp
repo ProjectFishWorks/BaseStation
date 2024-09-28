@@ -200,13 +200,7 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   else if(type == "historyIn"){
     Serial.println("History message received for node: " + String(nodeID) + " message: " + String(messageID) + "hours: " + String(data));
     JsonDocument historyDoc;
-    readLogData(systemID, baseStationID, nodeID, messageID, data, &historyDoc);
-
-    //Create the MQTT topic string
-    String topic = "historyOut/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID);
-
-    //Send the message to the MQTT broker
-    mqttClient.publish(topic.c_str(), historyDoc.as<String>().c_str(), true);
+    sendLogData(systemID, baseStationID, nodeID, messageID, data, &mqttClient);
 
   }
 

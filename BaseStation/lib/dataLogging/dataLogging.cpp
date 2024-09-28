@@ -48,25 +48,47 @@ void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationF
   logFile.close();
 }
 
-uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, JsonDocument *doc) {
+void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, PubSubClient* client){
+
+  //Allocate the JSON document
+  JsonDocument doc;
+  //Read the log data from the SD card
+  
+  time_t now;
+  time(&now);
+  uint64_t intervalStartTime = now - hoursToRead * 3600;
+  doc.clear();
+
+  uint64_t currentHour = now;
+
+  while((currentHour) + 1 > intervalStartTime){
+    readLogData(systemID, baseStationID, nodeID, messageID, currentHour, intervalStartTime, &doc);
+    //Create the MQTT topic string
+    String topic = "historyOut/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID) + "/" + String(currentHour);
+    Serial.println("Sending log data to MQTT topic: " + topic);
+    client->publish(topic.c_str(), doc.as<String>().c_str());
+    doc.clear();
+    currentHour -= 3600;
+  }
+  
+}
+
+uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint64_t hourToRead, uint64_t intervalStartTime, JsonDocument *doc) {
   
   
-  (*doc)["hours"] = hoursToRead;
+  (*doc)["hour"] = hourToRead;
   (*doc)["systemID"] = systemID;
   (*doc)["baseStationID"] = baseStationID;
   (*doc)["nodeID"] = nodeID;
   (*doc)["messageID"] = messageID;
 
   JsonArray history = (*doc)["history"].to<JsonArray>();
-  for(uint16_t i = 0; i < hoursToRead; i++){
-
     //Read historical log data from the SD card
     char filename[255];
 
     time_t now;
-    time(&now);
 
-    now -= i * 3600;
+    now = hourToRead;
 
     char field[MAX_LOG_FILE_FIELD_LENGTH];
 
@@ -85,6 +107,7 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
         logFile.readStringUntil('\n');
       }
 
+      uint16_t rowCounter = 0;
       while(logFile.available()){
         uint64_t dataTime = 0;
         uint32_t dataNodeID = 0;
@@ -102,10 +125,11 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
         data = strtoull(field, NULL, 10);
 
-        if(dataNodeID == nodeID && dataMessageID == messageID){
+        if(dataNodeID == nodeID && dataMessageID == messageID && dataTime >= intervalStartTime && rowCounter < 500){
           JsonObject nestedObject = history.createNestedObject();
           nestedObject["time"] = dataTime;
           nestedObject["data"] = data;
+          rowCounter++;
         }
 
       }
@@ -113,7 +137,6 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
     else{
       Serial.println("Log file does not exist, skipping: " + String(filename));
     }
-  }
   return 1;
 
 }
