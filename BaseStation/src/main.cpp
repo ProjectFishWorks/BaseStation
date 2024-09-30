@@ -199,6 +199,8 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   //History message
   else if(type == "historyIn"){
     Serial.println("History message received for node: " + String(nodeID) + " message: " + String(messageID) + "hours: " + String(data));
+
+    //Send the requested history data to the MQTT broker, data is the number of hours to read
     JsonDocument historyDoc;
     sendLogData(systemID, baseStationID, nodeID, messageID, data, &mqttClient);
 

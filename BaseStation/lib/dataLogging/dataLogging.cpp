@@ -1,5 +1,6 @@
 #include "dataLogging.h"
 
+//Initialize the SD card
 void initSDCard() {
     //Mount the SD Card
     SPI.begin(sck, miso, mosi, cs);
@@ -34,6 +35,7 @@ void initSDCard() {
     //xTaskCreate(writeLogFileQueueTask, "writeLogFileQueueTask", 10000, &log_file_queue, 1, NULL);
 }
 
+//Write log data to the SD card, creating a new log file if needed
 void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationFirmwareVersion, uint8_t nodeID, uint16_t messageID, uint64_t data) {
   //Create the log data row
   String logData = getLogDataRow(nodeID, messageID, data);
@@ -48,6 +50,7 @@ void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationF
   logFile.close();
 }
 
+//Send log data to the MQTT broker
 void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, PubSubClient* client){
 
   //Allocate the JSON document
@@ -81,9 +84,10 @@ void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint
   
 }
 
+//Read log data from the SD card for a specific hour, also ensuring the data is after a specific start time to allow for partial hour reads
 uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint64_t hourToRead, uint64_t intervalStartTime, JsonDocument *doc) {
   
-  
+  //Add some metadata to the JSON doc
   (*doc)["hour"] = hourToRead;
   (*doc)["systemID"] = systemID;
   (*doc)["baseStationID"] = baseStationID;
@@ -102,19 +106,22 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
 
     File logFile;
 
+    //Get the filename for the log file
     struct tm timeinfo;
     localtime_r(&now, &timeinfo);
-
     getLogFilename(filename, systemID, baseStationID, timeinfo);
 
     if(SD.exists(filename)) {
+
+      //Open the log file
       logFile = SD.open(filename, FILE_READ);
       Serial.println("Opened log file: " + String(filename));
       //Skip the header rows
       for(uint8_t i = 0; i < LOG_FILE_HEADER_ROW_COUNT; i++){
         logFile.readStringUntil('\n');
       }
-
+      
+      //Row counter to limit the number of rows read to fit within the MQTT message buffer size
       uint16_t rowCounter = 0;
       while(logFile.available()){
         uint64_t dataTime = 0;
@@ -124,6 +131,7 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
 
         uint8_t fieldLength = 0;
 
+        //Parse the expected fields from the log file row
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
         dataTime = strtoull(field, NULL, 10);
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
@@ -133,6 +141,7 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
         data = strtoull(field, NULL, 10);
 
+        //If the data matches the node and message ID, and the time is within the interval, add it to the JSON doc
         if(dataNodeID == nodeID && dataMessageID == messageID && dataTime >= intervalStartTime && rowCounter < 500){
           JsonObject nestedObject = history.createNestedObject();
           nestedObject["time"] = dataTime;
@@ -149,6 +158,7 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
 
 }
 
+//Parse a field from a log csv data row
 uint8_t parseLogDataField(File *file, char* field, size_t maxFieldLength) {
   size_t n = 0;
   char ch;
@@ -158,7 +168,10 @@ uint8_t parseLogDataField(File *file, char* field, size_t maxFieldLength) {
       continue;
     }
     field[n] = ch;
+
+    //If we reach a comma or newline, end the field
     if(ch == ',' || ch == '\n'){
+      //Null terminate the string
       field[n] = '\0';
       return n;
     }
