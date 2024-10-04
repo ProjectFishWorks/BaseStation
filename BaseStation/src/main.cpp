@@ -41,6 +41,8 @@
 #define gmtOffset_sec 0
 #define daylightOffset_sec 0
 
+#define manifestFileName "/manifest.json"
+
 //Node Controller Core - temp usage coustom code for base station is created
 NodeControllerCore core;
 
@@ -123,8 +125,10 @@ void MQTTConnect() {
       //Subscribe to the MQTT topic for this base station
       String topicIn = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
       String topicHistory = "historyIn/" + String(systemID) + "/" + String(baseStationID) + "/#";
+      String topicManifest = "manifestIn/" + String(systemID) + "/" + String(baseStationID);
       mqttClient.subscribe(topicIn.c_str());
       mqttClient.subscribe(topicHistory.c_str());
+      mqttClient.subscribe(topicManifest.c_str());
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
@@ -199,9 +203,38 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   //History message
   else if(type == "historyIn"){
     Serial.println("History message received for node: " + String(nodeID) + " message: " + String(messageID) + "hours: " + String(data));
+
+    //Send the requested history data to the MQTT broker, data is the number of hours to read
     JsonDocument historyDoc;
     sendLogData(systemID, baseStationID, nodeID, messageID, data, &mqttClient);
 
+  }else if(type == "manifestIn"){
+    Serial.println("Manifest message received");
+
+    //Send the requested history data to the MQTT broker, data is the number of hours to read
+    JsonDocument manifestDoc;
+
+    if(SD.exists(manifestFileName)) {
+      Serial.println("Manifest file exists, replacing");
+      SD.remove(manifestFileName);
+      File manifestFile = SD.open(manifestFileName, FILE_WRITE);
+      manifestFile.write(payload, length);
+    }else
+    {
+      Serial.println("Manifest file does not exist, creating new file");
+      File manifestFile = SD.open(manifestFileName, FILE_WRITE);
+      manifestFile.write(payload, length);
+    }
+
+    //Send the manifest data to the MQTT broker
+
+    Serial.println("Sending manifest data to MQTT");
+    String manifestTopic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+    mqttClient.publish(manifestTopic.c_str(), payload,true);
+
+  }
+  else {
+    Serial.println("Unknown message type");
   }
 
 }
@@ -287,6 +320,23 @@ void setup() {
         Serial.println("Node Controller Core Started");
     } else {
         Serial.println("Node Controller Core Failed to Start");
+    }
+
+    //Send manifest data to the MQTT broker
+    if(SD.exists(manifestFileName)) {
+      Serial.println("Manifest file exists, sending to MQTT");
+      File manifestFile = SD.open(manifestFileName, FILE_READ);
+      unsigned int manifestSize = manifestFile.size();
+      byte manifestData[manifestSize + 1];
+      manifestFile.read(manifestData, manifestSize);
+      String manifestString = String((char*)manifestData);
+      String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+
+      //Send the manifest data to the MQTT broker
+      mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
+
+    }else{
+      Serial.println("Manifest file does not exist");
     }
 
 

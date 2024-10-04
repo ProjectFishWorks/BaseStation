@@ -39,12 +39,6 @@ void initEmailClient(){
     config.time.gmt_offset = 0;
     config.time.day_light_offset = 3600;
 
-    if (!smtp.connect(&config))
-    {
-      MailClient.printf("Connection error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
-      return;
-    }
-
     smtp.keepAlive(5 /* tcp KeepAlive idle 5 seconds */, 5 /* tcp KeeAalive interval 5 seconds */, 1 /* tcp KeepAlive count 1 */);
 
     emailQueue = xQueueCreate(EMAIL_QUEUE_LENGTH, sizeof(AlertData));
@@ -85,6 +79,12 @@ void sendEmail(AlertData *data){
       message.text.charSet = F("utf-8"); // recommend for non-ASCII words in message.
       message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_low;
 
+      if (!smtp.connect(&config))
+      {
+        MailClient.printf("Connection error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
+        return;
+      }
+
       if (!smtp.isLoggedIn())
       {
         Serial.println("Not yet logged in.");
@@ -98,7 +98,7 @@ void sendEmail(AlertData *data){
       }
 
       // Start sending Email
-      if (!MailClient.sendMail(&smtp, &message,false))
+      if (!MailClient.sendMail(&smtp, &message,true))
         MailClient.printf("Error, Status Code: %d, Error Code: %d, Reason: %s\n", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
 }
 
