@@ -270,8 +270,8 @@ void setup() {
 
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
-    //WiFi.begin("White Rabbit", "2511560A7196");
-    WiFi.begin("IoT-Security", "B@kery204!");
+    WiFi.begin("White Rabbit", "2511560A7196");
+    //WiFi.begin("IoT-Security", "B@kery204!");
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
