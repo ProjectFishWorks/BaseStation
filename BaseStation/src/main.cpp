@@ -129,7 +129,24 @@ void MQTTConnect() {
       mqttClient.subscribe(topicIn.c_str());
       mqttClient.subscribe(topicHistory.c_str());
       mqttClient.subscribe(topicManifest.c_str());
-    } else {
+
+      //Send manifest data to the MQTT broker
+      if(SD.exists(manifestFileName)) {
+        Serial.println("Manifest file exists, sending to MQTT");
+        File manifestFile = SD.open(manifestFileName, FILE_READ);
+        String manifestString = manifestFile.readString();
+        String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+
+        //Send the manifest data to the MQTT broker
+        mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
+
+      }else{
+        Serial.println("Manifest file does not exist");
+      }
+
+
+    } 
+    else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
       Serial.println(" try again in 5 seconds");
@@ -212,7 +229,6 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
     Serial.println("Manifest message received");
 
     //Send the requested history data to the MQTT broker, data is the number of hours to read
-    JsonDocument manifestDoc;
 
     if(SD.exists(manifestFileName)) {
       Serial.println("Manifest file exists, replacing");
@@ -230,7 +246,16 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 
     Serial.println("Sending manifest data to MQTT");
     String manifestTopic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
-    mqttClient.publish(manifestTopic.c_str(), payload,true);
+
+    // Allocate the JSON document
+    JsonDocument manifestDoc;
+
+    // Parse the JSON object
+    DeserializationError error = deserializeJson(manifestDoc, payload);
+
+    Serial.println("Sending manifest data to MQTT:" + manifestDoc.as<String>());
+
+    mqttClient.publish(manifestTopic.c_str(), manifestDoc.as<String>().c_str(), true);
 
   }
   else {
@@ -245,8 +270,8 @@ void setup() {
 
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
-    WiFi.begin("White Rabbit", "2511560A7196");
-    //WiFi.begin("IoT-Security", "B@kery204!");
+    //WiFi.begin("White Rabbit", "2511560A7196");
+    WiFi.begin("IoT-Security", "B@kery204!");
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
@@ -321,24 +346,6 @@ void setup() {
     } else {
         Serial.println("Node Controller Core Failed to Start");
     }
-
-    //Send manifest data to the MQTT broker
-    if(SD.exists(manifestFileName)) {
-      Serial.println("Manifest file exists, sending to MQTT");
-      File manifestFile = SD.open(manifestFileName, FILE_READ);
-      unsigned int manifestSize = manifestFile.size();
-      byte manifestData[manifestSize + 1];
-      manifestFile.read(manifestData, manifestSize);
-      String manifestString = String((char*)manifestData);
-      String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
-
-      //Send the manifest data to the MQTT broker
-      mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
-
-    }else{
-      Serial.println("Manifest file does not exist");
-    }
-
 
 }
 
