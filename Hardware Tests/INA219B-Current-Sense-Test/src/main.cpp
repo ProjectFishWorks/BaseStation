@@ -3,7 +3,7 @@
 #include <Wire.h>
 #include <Adafruit_INA219.h>
 
-Adafruit_INA219 ina219;
+Adafruit_INA219 ina219(0x4A);
 
 TwoWire wire = TwoWire(0);
 
@@ -12,7 +12,10 @@ void setup(void)
 {
   Serial.begin(115200);
 
-  wire.setPins(14,13);
+  pinMode(11, OUTPUT);
+  digitalWrite(11, HIGH);
+
+  wire.setPins(9,10);
   
   delay(2000); // Give time to the serial monitor to start
     
@@ -21,7 +24,7 @@ void setup(void)
   // Initialize the INA219.
   // By default the initialization will use the largest range (32V, 2A).  However
   // you can call a setCalibration function to change this range (see comments).
-  if (! ina219.begin()) {
+  if (! ina219.begin(&wire)) {
     Serial.println("Failed to find INA219 chip");
     while (1) { delay(10); }
   }
