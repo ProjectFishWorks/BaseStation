@@ -1,4 +1,5 @@
 #include "emailClient.h"
+#include "ArduinoJson.h"
 
 /* Declare the global used SMTPSession object for SMTP transport */
 SMTPSession smtp;
@@ -64,13 +65,48 @@ void sendEmail(AlertData *data){
       char locTime[9];
       sprintf(locTime, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 
+      String deviceName = "Node " + String(data->nodeID);
+
+      //Send manifest data to the MQTT broker
+      if(SD.exists(manifestFileName)) {
+        Serial.println("Manifest file exists");
+        File manifestFile = SD.open(manifestFileName, FILE_READ);
+        String manifestString = manifestFile.readString();
+
+        JsonDocument manifestDoc;
+
+        // Parse the JSON object
+        DeserializationError error = deserializeJson(manifestDoc, manifestString);
+
+        if(error){
+          Serial.println("Error parsing manifest file");
+        }
+        else{
+            //Get the devices array from the manifest file
+            JsonArray devices = manifestDoc["Devices"].as<JsonArray>();
+            uint16_t index = 0;
+            while(!devices[index].isNull()){
+              Serial.println("Checking device: " + devices[index]["NodeID"].as<String>());
+              JsonObject device = devices[index];
+              if(device["NodeID"] == data->nodeID){
+                Serial.println("Device found in manifest file");
+                deviceName = device["DeviceName"].as<String>();
+                break;
+              }
+              index++;
+            }
+        }
+      }else{
+        Serial.println("Manifest file does not exist");
+      }
+
       //Set the subject and content of the email
       if(data->isWarning){
-        message.subject = "WARNING Project FishWorks - Node " + String(data->nodeID);
-        message.text.content = "Warning message received from Node " + String(data->nodeID) + " at " + String(locTime) +" UTC\n Please check the web app for more details.";
+        message.subject = "WARNING Fish Sense " + deviceName;
+        message.text.content = "Warning message received from " + deviceName + " at " + String(locTime) +" UTC\n Please check the web app for more details.";
       } else {
-        message.subject = "---ALERT--- Project FishWorks - Node " + String(data->nodeID);
-        message.text.content = "Alert message received from Node " + String(data->nodeID) + " at " + String(locTime) +" UTC\n Please check the web app for more details.";
+        message.subject = "---ALERT--- Fish Sense " + deviceName;
+        message.text.content = "Alert message received from " + deviceName + " at " + String(locTime) +" UTC\n Please check the web app for more details.";
       }
 
       message.addRecipient(F("User"), RECIPIENT_EMAIL);

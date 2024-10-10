@@ -10,6 +10,8 @@ struct AlertData
   uint8_t isWarning;
 };
 
+#define manifestFileName "/manifest.json"
+
 //Emails to held in the queue
 #define EMAIL_QUEUE_LENGTH 10
 
