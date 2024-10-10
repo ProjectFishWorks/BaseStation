@@ -268,6 +268,8 @@ void setup() {
     //Start the serial connection
     Serial.begin(115200);
 
+    pinMode(11, OUTPUT);
+
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
     //WiFi.begin("White Rabbit", "2511560A7196");
@@ -346,6 +348,8 @@ void setup() {
     } else {
         Serial.println("Node Controller Core Failed to Start");
     }
+
+    digitalWrite(11, HIGH);
 
 }
 

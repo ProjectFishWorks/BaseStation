@@ -15,10 +15,10 @@
 #define LOG_FILE_HEADER_ROW_COUNT 5
 
 //SD Card Pins
-#define sck 3
-#define miso 2
-#define mosi 1
-#define cs 0
+#define sck 7
+#define miso 6
+#define mosi 15
+#define cs 16
 
 //INITIALIZE SD CARD
 void initSDCard();
