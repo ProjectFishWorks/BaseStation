@@ -135,6 +135,7 @@ void MQTTConnect() {
         Serial.println("Manifest file exists, sending to MQTT");
         File manifestFile = SD.open(manifestFileName, FILE_READ);
         String manifestString = manifestFile.readString();
+        manifestFile.close();
         String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
 
         //Send the manifest data to the MQTT broker
@@ -235,11 +236,13 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
       SD.remove(manifestFileName);
       File manifestFile = SD.open(manifestFileName, FILE_WRITE);
       manifestFile.write(payload, length);
+      manifestFile.close();
     }else
     {
       Serial.println("Manifest file does not exist, creating new file");
       File manifestFile = SD.open(manifestFileName, FILE_WRITE);
       manifestFile.write(payload, length);
+      manifestFile.close();
     }
 
     //Send the manifest data to the MQTT broker
