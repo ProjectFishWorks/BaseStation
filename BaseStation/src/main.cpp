@@ -4,7 +4,7 @@
 #include "credential.h"
 
 #include <WiFi.h>
-//#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 
 #include "WiFiClientSecure.h"
 
@@ -276,31 +276,31 @@ void setup() {
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
     //WiFi.begin("White Rabbit", "2511560A7196");
-    WiFi.begin("IoT-Security", "B@kery204!");
+    //WiFi.begin("IoT-Security", "B@kery204!");
 
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
+    // while (WiFi.status() != WL_CONNECTED) {
+    //     delay(500);
+    //     Serial.print(".");
+    // }
 
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+    // Serial.println("");
+    // Serial.println("WiFi connected");
+    // Serial.println("IP address: ");
+    // Serial.println(WiFi.localIP());
     
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
-    //WiFiManager wm;
+    WiFiManager wm;
 
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
-    //wm.resetSettings();
+    wm.resetSettings();
 
     // Automatically connect using saved credentials,
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
     // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
     // then goes into a blocking loop awaiting configuration and will return success result
 
-   /*  bool res;
+   bool res;
     //TODO generate a unique name for the base station based on the system ID and base station ID
     res = wm.autoConnect("Project Fish Works Base Station");
     if(!res) {
@@ -308,12 +308,16 @@ void setup() {
         // ESP.restart();
     } 
     else {
+        while (WiFi.status() != WL_CONNECTED) {
+          delay(500);
+          Serial.print(".");
+        }
         //if you get here you have connected to the WiFi    
         Serial.println("");
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
-    } */
+    }
 
     // Start the NTP Client
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
