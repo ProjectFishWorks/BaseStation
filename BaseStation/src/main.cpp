@@ -8,7 +8,7 @@
 
 #include "WiFiClientSecure.h"
 
-#include <NodeControllerCore.h>
+#include <BaseStationCore.h>
 
 #include <PubSubClient.h>
 
@@ -44,7 +44,7 @@
 #define manifestFileName "/manifest.json"
 
 //Node Controller Core - temp usage coustom code for base station is created
-NodeControllerCore core;
+BaseStationCore core;
 
 //WiFi client
 WiFiClientSecure espClient;
@@ -293,7 +293,7 @@ void setup() {
 
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
-    wm.resetSettings();
+    //wm.resetSettings();
 
     // Automatically connect using saved credentials,
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
@@ -349,7 +349,7 @@ void setup() {
     initEmailClient();
 
     //Start the Node Controller Core
-    core = NodeControllerCore();
+    core = BaseStationCore();
     if(core.Init(receivedCANBUSMessage, 0x00)){
         Serial.println("Node Controller Core Started");
     } else {
