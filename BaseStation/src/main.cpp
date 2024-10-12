@@ -210,8 +210,27 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
     //TODO: This is a workaround until we move the Node Controller Core code to the base station codebase
     core.nodeID = nodeID;
 
+    uint32_t id = 0; 
+    id = ((nodeID << 24) | (messageID << 8)) >> 3;
+
+    twai_message_t message;
+
+    message.extd = 1;
+    message.identifier = id;
+    message.data_length_code = 8;
+    memcpy(message.data, &data, 8);
+
+    if (twai_transmit(&message, 2000) == ESP_OK) 
+    {
+      Serial.println("Test Message queued for transmission");
+    } 
+    else 
+    {
+      Serial.println("Test Failed to queue message for transmission");
+    }
+
     //Send the message to the CAN Bus
-    core.sendMessage(messageID, &data);
+    //core.sendMessage(messageID, &data);
 
     //Log the message to the SD card
 

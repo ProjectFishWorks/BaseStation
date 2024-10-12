@@ -74,13 +74,12 @@ bool BaseStationCore::Init(std::function<void(uint8_t nodeID, uint16_t messageID
               NULL);
 
   //Create task to transmit messages from tx_queue
-  xTaskCreatePinnedToCore(&BaseStationCore::transmit_tx_queue, 
+  xTaskCreate(&BaseStationCore::transmit_tx_queue, 
               "transmit_tx_queue", 
               10000, 
               &tx_queue, 
               30, 
-              NULL,
-              0);
+              NULL);
 
   //Return true since everything is successful
   return true;
@@ -89,13 +88,13 @@ bool BaseStationCore::Init(std::function<void(uint8_t nodeID, uint16_t messageID
 
 void BaseStationCore::transmit_tx_queue(void *queue) {
 
-  twai_message_t message;
-
   while(1){
+    twai_message_t message;
+
     if(xQueueReceive(*(QueueHandle_t *) queue, &message, RX_TX_BLOCK_TIME) == pdTRUE){
       Serial.println("Message transmitted with data: " + String(*message.data));
       //If there is a message in the queue, try to transmit it
-      if (twai_transmit(&message, 2000) == ESP_OK) 
+      if (twai_transmit(&message, 1) == ESP_OK) 
       {
         Serial.println("Message queued for transmission");
       } 
@@ -175,6 +174,7 @@ void BaseStationCore::rx_queue_event() {
       uint16_t messageID = 0;
 
       //Extract the data from the message data
+      Serial.println("Message received with data: " + String(*message.data));
       memcpy(&data, message.data, 8);
 
       //Extract the nodeID and messageID from the message identifier with format:
