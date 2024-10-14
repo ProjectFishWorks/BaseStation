@@ -28,7 +28,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x00
+#define baseStationID 0x01
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 #define mqtt_server "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud"
@@ -281,9 +281,22 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 
 }
 
+void resetCANBusToggle() {
+  Serial.println("Toggling CAN Bus Power");
+  if (digitalRead(11) == HIGH) {
+    digitalWrite(11, LOW);
+    Serial.println("CAN Bus Power Off");
+  } else {
+    digitalWrite(11, HIGH);
+    Serial.println("CAN Bus Power On");
+  }
+}
+
 void setup() {
     //Start the serial connection
     Serial.begin(115200);
+
+    pinMode(0, INPUT_PULLUP);  //Program button with pullup
 
     pinMode(11, OUTPUT);
 
@@ -384,5 +397,13 @@ void loop() {
     mqttClient.loop();
 
     emailClientLoop();
+
+    if (digitalRead(0) == LOW) {
+      resetCANBusToggle();
+      //millis delay bebounce
+      delay(200);
+      
+
+      }
 
 }
