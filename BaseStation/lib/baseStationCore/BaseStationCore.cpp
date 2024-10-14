@@ -4,9 +4,16 @@ BaseStationCore::BaseStationCore(){
 }
 
 
-twai_message_t BaseStationCore::create_message(uint32_t id, uint64_t *data) {
+twai_message_t BaseStationCore::create_message(uint16_t messageID, uint8_t nodeID , uint64_t *data) {
   twai_message_t message;
 
+  //Create a CAN Bus ID with format:
+  //8bit node ID, 16bit message ID, 5bit reserved
+	//NNMMMMRR
+  //(NNNN)(NNNN)(MMMM)(MMMM)(MMMM)(MMMM)(RRRR)(R000)
+  uint32_t id = 0; 
+  id = ((nodeID << 24) | (messageID << 8)) >> 3;
+  
   message.extd = 1;
   message.identifier = id;
   message.data_length_code = 8;
@@ -199,23 +206,12 @@ void BaseStationCore::rx_queue_event() {
 }
 
 void BaseStationCore::sendMessage(uint16_t messageID, uint64_t *data) {
-  //Create a CAN Bus ID with format:
-  //8bit node ID, 16bit message ID, 5bit reserved
-	//NNMMMMRR
-  //(NNNN)(NNNN)(MMMM)(MMMM)(MMMM)(MMMM)(RRRR)(R000)
-  uint32_t id = 0; 
-  id = ((this->nodeID << 24) | (messageID << 8)) >> 3;
 
-  Serial.print("Sending message with Node ID: ");
-  Serial.print(nodeID, HEX);
-  Serial.print(" Message ID: ");
-  Serial.print(messageID, HEX);
-  Serial.print(" Data: ");
-  Serial.println(*data, HEX);
-  //Create a CAN Bus message
-  twai_message_t message = create_message(id, data);
+
+
+
   //Send the message to the tx_queue
-  xQueueSend(tx_queue, &message, portMAX_DELAY);
+  //xQueueSend(tx_queue, &message, portMAX_DELAY);
 }
 void BaseStationCore::sendMessage(uint16_t messageID, float *data){
   uint64_t data64 = 0;

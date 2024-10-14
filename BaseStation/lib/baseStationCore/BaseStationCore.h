@@ -20,8 +20,6 @@
 class BaseStationCore
 {
 private:
-    //Creates a TWAI message
-    twai_message_t create_message(uint32_t id, uint64_t *data);
 
     //Pattern from:
     //https://stackoverflow.com/questions/45831114/c-freertos-task-invalid-use-of-non-static-member-function
@@ -54,6 +52,9 @@ public:
 
     //Constructor
     BaseStationCore();
+
+    //Creates a TWAI message
+    twai_message_t create_message(uint16_t messageID, uint8_t nodeID , uint64_t *data);
 
     //Initialize the base station core
     bool Init(std::function<void(uint8_t nodeID, uint16_t messageID, uint64_t data)> onMessageReceived, uint8_t nodeID);

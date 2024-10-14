@@ -208,17 +208,15 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   if(type == "in"){
     //Set the node ID in the Node Controller Core to the node ID of the received message
     //TODO: This is a workaround until we move the Node Controller Core code to the base station codebase
-    core.nodeID = nodeID;
+    Serial.print("Sending message with Node ID: ");
+    Serial.print(nodeID, HEX);
+    Serial.print(" Message ID: ");
+    Serial.print(messageID, HEX);
+    Serial.print(" Data: ");
+    Serial.println(data, HEX);
 
-    uint32_t id = 0; 
-    id = ((nodeID << 24) | (messageID << 8)) >> 3;
-
-    twai_message_t message;
-
-    message.extd = 1;
-    message.identifier = id;
-    message.data_length_code = 8;
-    memcpy(message.data, &data, 8);
+    //Create a CAN Bus message
+    twai_message_t message = core.create_message(messageID, nodeID, &data);
 
     if (twai_transmit(&message, 2000) == ESP_OK) 
     {
@@ -228,9 +226,6 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
     {
       Serial.println("Test Failed to queue message for transmission");
     }
-
-    //Send the message to the CAN Bus
-    //core.sendMessage(messageID, &data);
 
     //Log the message to the SD card
 
