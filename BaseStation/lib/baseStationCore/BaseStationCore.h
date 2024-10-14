@@ -11,8 +11,8 @@
 
 
 //Queue length for tx_queue and rx_queue
-#define TX_QUEUE_LENGTH 10
-#define RX_QUEUE_LENGTH 10
+#define TX_QUEUE_LENGTH 100
+#define RX_QUEUE_LENGTH 100
 
 //Time to wait for a message to be received TODO: not sure what this does, set to one tick=1ms right now
 #define RX_TX_BLOCK_TIME (1 * portTICK_PERIOD_MS)

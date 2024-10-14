@@ -28,7 +28,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x01
+#define baseStationID 0x00
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 #define mqtt_server "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud"
@@ -398,7 +398,7 @@ void loop() {
 
     emailClientLoop();
 
-    if (digitalRead(0) == LOW) {
+   if (digitalRead(0) == LOW) {
       resetCANBusToggle();
       //millis delay bebounce
       delay(200);

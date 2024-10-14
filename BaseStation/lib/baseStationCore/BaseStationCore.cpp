@@ -66,19 +66,21 @@ bool BaseStationCore::Init(std::function<void(uint8_t nodeID, uint16_t messageID
   rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(twai_message_t));
 
   //Start tasks
-  xTaskCreate(this->start_receive_to_rx_queue_task, 
+  xTaskCreatePinnedToCore(this->start_receive_to_rx_queue_task, 
               "start_rx_task_impl", 
               10000, //TODO: Not sure what the stack size should be for this task, 10000 is just a guess, 2048 is default but causes stack overflow crashes in base station
               this, 
               10, 
-              NULL);
+              NULL,
+              1);
 
-  xTaskCreate(this->start_rx_queue_event_task, 
+  xTaskCreatePinnedToCore(this->start_rx_queue_event_task, 
               "start_rx_queue_event_task_impl", 
               10000, 
               this, 
               20, 
-              NULL);
+              NULL,
+              0);
 
   //Create task to transmit messages from tx_queue
   xTaskCreate(&BaseStationCore::transmit_tx_queue, 
@@ -158,6 +160,7 @@ void BaseStationCore::receive_to_rx_queue() {
       receive = twai_receive(&message, RX_TX_BLOCK_TIME);
       if (receive == ESP_OK) {
         //If message is received succesfully, put it in the rx_queue
+        Serial.println("Messages in rx_queue: " + String(uxQueueMessagesWaiting(this->rx_queue)));
         xQueueSend(this->rx_queue, &message, 0);
       } else if(receive == ESP_ERR_INVALID_STATE || receive == ESP_ERR_INVALID_ARG) {
         Serial.println("Failed to receive message");
@@ -181,7 +184,6 @@ void BaseStationCore::rx_queue_event() {
       uint16_t messageID = 0;
 
       //Extract the data from the message data
-      Serial.println("Message received with data: " + String(*message.data));
       memcpy(&data, message.data, 8);
 
       //Extract the nodeID and messageID from the message identifier with format:
