@@ -369,6 +369,9 @@ void setup() {
     //The max payload size we can send. This seems to be the max size you can use.
     mqttClient.setBufferSize(34464);
 
+    mqttClient.setKeepAlive(30);
+    mqttClient.setSocketTimeout(30);
+
     //TODO: Add a check to see if the SD card is still mounted, if not remount it
     //TODO: Add a check to see if the WiFi is still connected, if not reconnect
     initSDCard();
