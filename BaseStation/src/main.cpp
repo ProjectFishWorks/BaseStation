@@ -17,6 +17,11 @@
 #include "emailClient.h"
 
 #include <dataLogging.h>
+
+#include "FS.h"
+#include <LittleFS.h>
+#include <time.h>
+
 //--------------------------------------
 
 //CAN Bus message IDs for warnings and alerts
@@ -28,7 +33,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x00
+#define baseStationID 0x02
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 #define mqtt_server "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud"
@@ -130,7 +135,24 @@ void MQTTConnect() {
       mqttClient.subscribe(topicHistory.c_str());
       mqttClient.subscribe(topicManifest.c_str());
 
+
       //Send manifest data to the MQTT broker
+      if(LittleFS.exists(manifestFileName)) {
+        Serial.println("Manifest file exists, sending to MQTT");
+        File manifestFile = LittleFS.open(manifestFileName, FILE_READ);
+        String manifestString = manifestFile.readString();
+        manifestFile.close();
+        String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+
+        //Send the manifest data to the MQTT broker
+        mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
+
+      }else{
+        Serial.println("Manifest file does not exist");
+      }
+
+
+      /* //Send manifest data to the MQTT broker
       if(SD.exists(manifestFileName)) {
         Serial.println("Manifest file exists, sending to MQTT");
         File manifestFile = SD.open(manifestFileName, FILE_READ);
@@ -143,7 +165,7 @@ void MQTTConnect() {
 
       }else{
         Serial.println("Manifest file does not exist");
-      }
+      } */
 
 
     } 
@@ -245,7 +267,21 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 
     //Send the requested history data to the MQTT broker, data is the number of hours to read
 
-    if(SD.exists(manifestFileName)) {
+    if(LittleFS.exists(manifestFileName)) {
+      Serial.println("Manifest file exists, replacing");
+      LittleFS.remove(manifestFileName);
+      File manifestFile = LittleFS.open(manifestFileName, FILE_WRITE);
+      manifestFile.write(payload, length);
+      manifestFile.close();
+    }else
+    {
+      Serial.println("Manifest file does not exist, creating new file");
+      File manifestFile = LittleFS.open(manifestFileName, FILE_WRITE);
+      manifestFile.write(payload, length);
+      manifestFile.close();
+    }
+
+    /* if(SD.exists(manifestFileName)) {
       Serial.println("Manifest file exists, replacing");
       SD.remove(manifestFileName);
       File manifestFile = SD.open(manifestFileName, FILE_WRITE);
@@ -257,7 +293,7 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
       File manifestFile = SD.open(manifestFileName, FILE_WRITE);
       manifestFile.write(payload, length);
       manifestFile.close();
-    }
+    } */
 
     //Send the manifest data to the MQTT broker
 
@@ -375,6 +411,12 @@ void setup() {
     //TODO: Add a check to see if the SD card is still mounted, if not remount it
     //TODO: Add a check to see if the WiFi is still connected, if not reconnect
     initSDCard();
+    
+    if (!LittleFS.begin(0)) {
+      Serial.println("LittleFS Mount Failed");
+      return;
+    }
+    Serial.println("LittleFS Mount Successful");
 
     initEmailClient();
 
