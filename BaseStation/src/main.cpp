@@ -36,9 +36,9 @@
 #define baseStationID 0x02
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
-#define mqtt_server "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud"
-#define mqtt_username "fishworks-dev"
-#define mqtt_password "F1shworks!"
+char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
+char mqtt_username[255] = "fishworks-dev";
+char mqtt_password[255] = "F1shworks!";
 
 //Time
 //TODO: add timezone support to WiFiManager
@@ -47,6 +47,17 @@
 #define daylightOffset_sec 0
 
 #define manifestFileName "/manifest.json"
+
+#define mqttConfigFileName "/mqttConfig.json"
+
+//flag for saving data
+bool shouldSaveConfig = false;
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  Serial.println("Should save mqtt config");
+  shouldSaveConfig = true;
+}
 
 //Node Controller Core - temp usage coustom code for base station is created
 BaseStationCore core;
@@ -336,6 +347,40 @@ void setup() {
 
     pinMode(11, OUTPUT);
 
+    if (!LittleFS.begin(0)) {
+      Serial.println("LittleFS Mount Failed");
+      //TODO: stall startup here
+      return;
+    }
+
+    Serial.println("LittleFS Mount Successful");
+
+    if(LittleFS.exists(mqttConfigFileName)) {
+      Serial.println("MQTT Config file exists, loading");
+      File mqttConfigFile = LittleFS.open(mqttConfigFileName, FILE_READ);
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, mqttConfigFile);
+      if (error) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.c_str());
+        return;
+      }
+      strcpy(mqtt_server, doc["mqtt_server"]);
+      strcpy(mqtt_username, doc["mqtt_username"]);
+      strcpy(mqtt_password, doc["mqtt_password"]);
+      mqttConfigFile.close();
+    }else{
+      Serial.println("MQTT Config file does not exist, creating new file");
+      File mqttConfigFile = LittleFS.open(mqttConfigFileName, FILE_WRITE);
+      JsonDocument doc;
+      doc["mqtt_server"] = mqtt_server;
+      doc["mqtt_username"] = mqtt_username;
+      doc["mqtt_password"] = mqtt_password;
+      serializeJson(doc, mqttConfigFile);
+      mqttConfigFile.close();
+    }
+
+
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
     //WiFi.begin("White Rabbit", "2511560A7196");
@@ -353,10 +398,22 @@ void setup() {
     
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wm;
+    WiFiManagerParameter custom_text("<h4>MQTT Broker Login</h4>");
+
+    WiFiManagerParameter custom_mqtt_server("server", "MQTT Server", mqtt_server, 255);
+    WiFiManagerParameter custom_mqtt_username("username", "MQTT Username", mqtt_username, 255);
+    WiFiManagerParameter custom_mqtt_password("password", "MQTT Password", mqtt_password, 255);
+
+    wm.setSaveConfigCallback(saveConfigCallback);
+
+    wm.addParameter(&custom_text);
+    wm.addParameter(&custom_mqtt_server);
+    wm.addParameter(&custom_mqtt_username);
+    wm.addParameter(&custom_mqtt_password);
 
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
-    //wm.resetSettings();
+    wm.resetSettings();
 
     // Automatically connect using saved credentials,
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
@@ -380,6 +437,27 @@ void setup() {
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
+    }
+
+    //read updated parameters
+    strcpy(mqtt_server, custom_mqtt_server.getValue());
+    strcpy(mqtt_username, custom_mqtt_username.getValue());
+    strcpy(mqtt_password, custom_mqtt_password.getValue());
+
+    //save the custom parameters to FS
+    if (shouldSaveConfig) {
+      Serial.println("Saving mqtt config");
+      if(LittleFS.exists(mqttConfigFileName)){
+        LittleFS.remove(mqttConfigFileName);
+        Serial.println("Removing old mqtt config file");
+      }
+      File mqttConfigFile = LittleFS.open(mqttConfigFileName, FILE_WRITE);
+      JsonDocument doc;
+      doc["mqtt_server"] = mqtt_server;
+      doc["mqtt_username"] = mqtt_username;
+      doc["mqtt_password"] = mqtt_password;
+      serializeJson(doc, mqttConfigFile);
+      mqttConfigFile.close();
     }
 
     // Start the NTP Client
@@ -411,12 +489,6 @@ void setup() {
     //TODO: Add a check to see if the SD card is still mounted, if not remount it
     //TODO: Add a check to see if the WiFi is still connected, if not reconnect
     initSDCard();
-    
-    if (!LittleFS.begin(0)) {
-      Serial.println("LittleFS Mount Failed");
-      return;
-    }
-    Serial.println("LittleFS Mount Successful");
 
     initEmailClient();
 
