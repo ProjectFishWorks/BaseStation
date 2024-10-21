@@ -18,6 +18,8 @@
 
 #include <dataLogging.h>
 
+#include <Adafruit_NeoPixel.h>
+
 #include "FS.h"
 #include <LittleFS.h>
 #include <time.h>
@@ -52,6 +54,14 @@ char mqtt_password[255] = "F1shworks!";
 
 //flag for saving data
 bool shouldSaveConfig = false;
+
+
+//NeoPixel Setup Stuffs
+#define DELAYVAL 500 // Time (in milliseconds) to pause between pixels
+int pin           = 15; // Digital pin connected to the NeoPixels.
+int numPixels     = 2; // Number of NeoPixels
+int pixelFormat   = NEO_GRB + NEO_KHZ800; // Pixel format
+Adafruit_NeoPixel *pixels;
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -122,6 +132,8 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
     //Log the message to the SD card
 
     writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+
+
 
 }
 
@@ -339,13 +351,27 @@ void resetCANBusToggle() {
   }
 }
 
+void annoyingBuzz() {
+  for(int i = 0; i < 5; i++){
+    digitalWrite(48, HIGH);
+    delay(100);
+    Serial.println("Bzzzzz");
+    digitalWrite(48, LOW);
+    delay(100);
+  }
+}
+
+
 void setup() {
     //Start the serial connection
     Serial.begin(115200);
 
     pinMode(0, INPUT_PULLUP);  //Program button with pullup
+    pinMode(21, INPUT_PULLUP); //ButtBlue
+    pinMode(47, INPUT_PULLUP); //ButtWhite
+    pinMode(48, OUTPUT); //Buzzer
 
-    pinMode(11, OUTPUT);
+    pinMode(11, OUTPUT); //CAN Bus Power
 
     if (!LittleFS.begin(0)) {
       Serial.println("LittleFS Mount Failed");
@@ -413,7 +439,7 @@ void setup() {
 
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
-    wm.resetSettings();
+    //wm.resetSettings();
 
     // Automatically connect using saved credentials,
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
@@ -500,7 +526,12 @@ void setup() {
         Serial.println("Node Controller Core Failed to Start");
     }
 
-    digitalWrite(11, HIGH);
+    digitalWrite(11, HIGH); //Turn on the CAN Bus power
+    digitalWrite(48, LOW); //Turn off the buzzer
+
+    //NeoPixel Setup Stuffs part 2
+    //pixels = new Adafruit_NeoPixel(numPixels, pin, pixelFormat);
+    //pixels->begin();
 
 }
 
@@ -515,12 +546,32 @@ void loop() {
 
     emailClientLoop();
 
-   if (digitalRead(0) == LOW) {
+    if (digitalRead(0) == LOW) {
       resetCANBusToggle();
-      //millis delay bebounce
-      delay(200);
-      
-
+      //latching debounce
+      while(digitalRead(0) == LOW){
+        delay(50);
+        }
       }
-
+    if (digitalRead(21) == LOW) {
+      Serial.println("Button 21 pressed");
+      annoyingBuzz();
+      //latching debounce
+      while(digitalRead(21) == LOW){
+        delay(50);
+        }
+      }
+    if (digitalRead(47) == LOW) {
+    Serial.println("Button 47 pressed");
+      //laching debounce
+      while(digitalRead(47) == LOW){
+        //pixels->clear();
+        //for(int i=0; i<numPixels; i++) {
+          //pixels->setPixelColor(i, pixels->Color(0, 150, 0));
+          //pixels->show();
+          //delay(DELAYVAL);
+        delay(50);
+        //}
+      }
+    }
 }
