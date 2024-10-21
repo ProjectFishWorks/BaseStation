@@ -3,8 +3,8 @@
 //Initialize the SD card
 void initSDCard() {
     //Mount the SD Card
-    SPI.begin(sck, miso, mosi, cs);
-    if (!SD.begin(cs)) {
+    SPI.begin(sd_sck, sd_miso, sd_mosi, sd_cs);
+    if (!SD.begin(sd_cs)) {
         Serial.println("Card Mount Failed");
     }else{
         Serial.println("Card Mount Success");
