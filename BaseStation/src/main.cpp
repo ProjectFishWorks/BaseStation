@@ -57,11 +57,18 @@ bool shouldSaveConfig = false;
 
 
 //NeoPixel Setup Stuffs
-#define DELAYVAL 500 // Time (in milliseconds) to pause between pixels
-int pin           = 45; // Digital pin connected to the NeoPixels.
-int numPixels     = 2; // Number of NeoPixels
-int pixelFormat   = NEO_GRB + NEO_KHZ800; // Pixel format
-Adafruit_NeoPixel *pixels;
+#define PIN         45 // On Trinket or Gemma, suggest changing this to 1
+
+// How many NeoPixels are attached to the Arduino?
+#define NUMPIXELS   2 // Popular NeoPixel ring size
+
+// When setting up the NeoPixel library, we tell it how many pixels,
+// and which pin to use to send signals. Note that for older NeoPixel
+// strips you might need to change the third parameter -- see the
+// strandtest example for more information on possible values.
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+
+#define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -530,8 +537,10 @@ void setup() {
     digitalWrite(48, LOW); //Turn off the buzzer
 
     //NeoPixel Setup Stuffs part 2
-    pixels = new Adafruit_NeoPixel(numPixels, pin, pixelFormat);
-    pixels->begin();
+    #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
+    clock_prescale_set(clock_div_1);
+    #endif
+    pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
 
 }
 
@@ -565,16 +574,24 @@ void loop() {
     Serial.println("Button 47 pressed");
       //laching debounce
       while(digitalRead(47) == LOW){
-        pixels->clear();
-        //for(int i=0; i<numPixels; i++) {
-          pixels->setPixelColor(0, pixels->Color(0, 150, 0));
-          Serial.println("Green");
-          pixels->setPixelColor(1, pixels->Color(0, 0, 150));
-          Serial.println("Blue");
-          pixels->show();
-          delay(DELAYVAL);
+        pixels.clear(); // Set all pixel colors to 'off'
+
+          // The first NeoPixel in a strand is #0, second is 1, all the way up
+          // to the count of pixels minus one.
+          for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
+
+            // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
+            // Here we're using a moderately bright green color:
+            pixels.setPixelColor(i, pixels.Color(0, 150, 0));
+
+            pixels.show();   // Send the updated pixel colors to the hardware.
+
+            delay(DELAYVAL); // Pause before next pass through loop
         delay(50);
-        //}
       }
+    }
+    pixels.setPixelColor(0, pixels.Color(0, 0, 0));
+    pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+    pixels.show(); // Set all pixel colors to 'off'
     }
 }
