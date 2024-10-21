@@ -58,7 +58,7 @@ bool shouldSaveConfig = false;
 
 //NeoPixel Setup Stuffs
 #define DELAYVAL 500 // Time (in milliseconds) to pause between pixels
-int pin           = 15; // Digital pin connected to the NeoPixels.
+int pin           = 45; // Digital pin connected to the NeoPixels.
 int numPixels     = 2; // Number of NeoPixels
 int pixelFormat   = NEO_GRB + NEO_KHZ800; // Pixel format
 Adafruit_NeoPixel *pixels;
@@ -530,8 +530,8 @@ void setup() {
     digitalWrite(48, LOW); //Turn off the buzzer
 
     //NeoPixel Setup Stuffs part 2
-    //pixels = new Adafruit_NeoPixel(numPixels, pin, pixelFormat);
-    //pixels->begin();
+    pixels = new Adafruit_NeoPixel(numPixels, pin, pixelFormat);
+    pixels->begin();
 
 }
 
@@ -565,11 +565,14 @@ void loop() {
     Serial.println("Button 47 pressed");
       //laching debounce
       while(digitalRead(47) == LOW){
-        //pixels->clear();
+        pixels->clear();
         //for(int i=0; i<numPixels; i++) {
-          //pixels->setPixelColor(i, pixels->Color(0, 150, 0));
-          //pixels->show();
-          //delay(DELAYVAL);
+          pixels->setPixelColor(0, pixels->Color(0, 150, 0));
+          Serial.println("Green");
+          pixels->setPixelColor(1, pixels->Color(0, 0, 150));
+          Serial.println("Blue");
+          pixels->show();
+          delay(DELAYVAL);
         delay(50);
         //}
       }
