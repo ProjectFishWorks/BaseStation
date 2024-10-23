@@ -78,6 +78,9 @@ void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint
     String topic = "historyOut/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID) + "/" + timeString;
     Serial.println("Sending log data to MQTT topic: " + topic);
     client->publish(topic.c_str(), doc.as<String>().c_str());
+
+    client->loop();
+
     doc.clear();
     currentHour -= 3600;
   }
