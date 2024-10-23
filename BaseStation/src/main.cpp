@@ -155,6 +155,8 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
 
     writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
 
+    mqttClient.loop();
+
 
 
 }
