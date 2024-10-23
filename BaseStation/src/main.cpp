@@ -40,6 +40,9 @@ char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
 char mqtt_username[255] = "fishworks-dev";
 char mqtt_password[255] = "F1shworks!";
 
+char email_recipient[255] = "sebastien@robitaille.info";
+char email_recipient_name[255] = "Sebastien Robitaille";
+
 //Time
 //TODO: add timezone support to WiFiManager
 #define ntpServer "pool.ntp.org"
@@ -48,7 +51,7 @@ char mqtt_password[255] = "F1shworks!";
 
 #define manifestFileName "/manifest.json"
 
-#define mqttConfigFileName "/mqttConfig.json"
+#define mqttConfigFileName "/config.json"
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -162,6 +165,7 @@ void MQTTConnect() {
         Serial.println("Manifest file does not exist");
       }
 
+      digitalWrite(11, HIGH);
 
       /* //Send manifest data to the MQTT broker
       if(SD.exists(manifestFileName)) {
@@ -347,7 +351,9 @@ void setup() {
 
     pinMode(11, OUTPUT);
 
-    if (!LittleFS.begin(0)) {
+    digitalWrite(11, LOW);
+
+    if (!LittleFS.begin(1)) {
       Serial.println("LittleFS Mount Failed");
       //TODO: stall startup here
       return;
@@ -357,9 +363,9 @@ void setup() {
 
     if(LittleFS.exists(mqttConfigFileName)) {
       Serial.println("MQTT Config file exists, loading");
-      File mqttConfigFile = LittleFS.open(mqttConfigFileName, FILE_READ);
+      File configFile = LittleFS.open(mqttConfigFileName, FILE_READ);
       JsonDocument doc;
-      DeserializationError error = deserializeJson(doc, mqttConfigFile);
+      DeserializationError error = deserializeJson(doc, configFile);
       if (error) {
         Serial.print(F("deserializeJson() failed: "));
         Serial.println(error.c_str());
@@ -368,18 +374,23 @@ void setup() {
       strcpy(mqtt_server, doc["mqtt_server"]);
       strcpy(mqtt_username, doc["mqtt_username"]);
       strcpy(mqtt_password, doc["mqtt_password"]);
-      mqttConfigFile.close();
+      strcpy(email_recipient, doc["email_recipient"]);
+      strcpy(email_recipient_name, doc["email_recipient_name"]);
+      configFile.close();
     }else{
       Serial.println("MQTT Config file does not exist, creating new file");
-      File mqttConfigFile = LittleFS.open(mqttConfigFileName, FILE_WRITE);
+      File configFile = LittleFS.open(mqttConfigFileName, FILE_WRITE);
       JsonDocument doc;
       doc["mqtt_server"] = mqtt_server;
       doc["mqtt_username"] = mqtt_username;
       doc["mqtt_password"] = mqtt_password;
-      serializeJson(doc, mqttConfigFile);
-      mqttConfigFile.close();
+      doc["email_recipient"] = email_recipient;
+      doc["email_recipient_name"] = email_recipient_name;
+      serializeJson(doc, configFile);
+      configFile.close();
     }
 
+    Serial.println("Starting");
 
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
@@ -398,18 +409,26 @@ void setup() {
     
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wm;
-    WiFiManagerParameter custom_text("<h4>MQTT Broker Login</h4>");
+    WiFiManagerParameter mqtt_header_text("<h4>MQTT Broker Login</h4>");
 
     WiFiManagerParameter custom_mqtt_server("server", "MQTT Server", mqtt_server, 255);
     WiFiManagerParameter custom_mqtt_username("username", "MQTT Username", mqtt_username, 255);
     WiFiManagerParameter custom_mqtt_password("password", "MQTT Password", mqtt_password, 255);
 
+    WiFiManagerParameter email_header_text("<h4>Email Alert Recipients</h4>");
+    WiFiManagerParameter custom_email_recipient("email", "Email Recipient", email_recipient, 255);
+    WiFiManagerParameter custom_email_recipient_name("email_name", "Email Recipient Name", email_recipient_name, 255);
+
     wm.setSaveConfigCallback(saveConfigCallback);
 
-    wm.addParameter(&custom_text);
+    wm.addParameter(&mqtt_header_text);
     wm.addParameter(&custom_mqtt_server);
     wm.addParameter(&custom_mqtt_username);
     wm.addParameter(&custom_mqtt_password);
+    wm.addParameter(&email_header_text);
+    wm.addParameter(&custom_email_recipient);
+    wm.addParameter(&custom_email_recipient_name);
+
 
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
@@ -443,6 +462,7 @@ void setup() {
     strcpy(mqtt_server, custom_mqtt_server.getValue());
     strcpy(mqtt_username, custom_mqtt_username.getValue());
     strcpy(mqtt_password, custom_mqtt_password.getValue());
+    strcpy(email_recipient, custom_email_recipient.getValue());
 
     //save the custom parameters to FS
     if (shouldSaveConfig) {
@@ -456,6 +476,8 @@ void setup() {
       doc["mqtt_server"] = mqtt_server;
       doc["mqtt_username"] = mqtt_username;
       doc["mqtt_password"] = mqtt_password;
+      doc["email_recipient"] = email_recipient;
+      doc["email_recipient_name"] = email_recipient_name;
       serializeJson(doc, mqttConfigFile);
       mqttConfigFile.close();
     }
@@ -500,8 +522,6 @@ void setup() {
         Serial.println("Node Controller Core Failed to Start");
     }
 
-    digitalWrite(11, HIGH);
-
 }
 
 void loop() {
@@ -513,7 +533,7 @@ void loop() {
     }
     mqttClient.loop();
 
-    emailClientLoop();
+    emailClientLoop(email_recipient, email_recipient_name);
 
    if (digitalRead(0) == LOW) {
       resetCANBusToggle();

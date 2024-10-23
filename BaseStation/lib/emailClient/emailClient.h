@@ -30,11 +30,11 @@ struct AlertData
 
 void sendEmailToQueue(AlertData *data);
 //Sends email based on the contents of the AlertData
-void sendEmail(AlertData *data);
+void sendEmail(AlertData *data, char *recipient, char *recipient_name);
 
 void initEmailClient();
 
-void emailClientLoop();
+void emailClientLoop(char *recipient, char *recipient_name);
 
 // Callback function to get the Email sending status
 void smtpCallback(SMTP_Status status);

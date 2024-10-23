@@ -13,10 +13,10 @@ void sendEmailToQueue(AlertData *data){
     xQueueSend(emailQueue, data, portMAX_DELAY);
 }
 
-void emailClientLoop(){
+void emailClientLoop(char *recipient, char *recipient_name){
     AlertData alertData;
     if(xQueueReceive(emailQueue, &alertData, 1) == pdTRUE) {
-      sendEmail(&alertData);
+      sendEmail(&alertData, recipient, recipient_name);
     }
 }
 
@@ -45,7 +45,7 @@ void initEmailClient(){
     emailQueue = xQueueCreate(EMAIL_QUEUE_LENGTH, sizeof(AlertData));
 }
 
-void sendEmail(AlertData *data){
+void sendEmail(AlertData *data, char *recipient, char *recipient_name){
 
       /* Declare the message class */
       SMTP_Message message;
@@ -109,7 +109,7 @@ void sendEmail(AlertData *data){
         message.text.content = "Alert message received from " + deviceName + " at " + String(locTime) +" UTC\n Please check the web app for more details.";
       }
 
-      message.addRecipient(F("User"), RECIPIENT_EMAIL);
+      message.addRecipient(recipient_name, recipient);
 
       message.text.transfer_encoding = "base64"; // recommend for non-ASCII words in message.
       message.text.charSet = F("utf-8"); // recommend for non-ASCII words in message.
