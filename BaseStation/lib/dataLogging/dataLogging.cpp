@@ -64,8 +64,12 @@ void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint
 
  time_t currentHour = now;
 
+ uint32_t decimationInterval = hoursToRead * 30;
+
+ Serial.println("Decimation interval: " + String(decimationInterval));
+
   while((currentHour) + 1 > intervalStartTime){
-    readLogData(systemID, baseStationID, nodeID, messageID, currentHour, intervalStartTime, &doc);
+    readLogData(systemID, baseStationID, nodeID, messageID, currentHour, intervalStartTime, &doc, decimationInterval);
     //Create the MQTT topic string
     //Create the time portion of the topic
     struct tm hour;
@@ -88,7 +92,7 @@ void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint
 }
 
 //Read log data from the SD card for a specific hour, also ensuring the data is after a specific start time to allow for partial hour reads
-uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint64_t hourToRead, uint64_t intervalStartTime, JsonDocument *doc) {
+uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint64_t hourToRead, uint64_t intervalStartTime, JsonDocument *doc, uint32_t decimationInterval) {
   
   //Add some metadata to the JSON doc
   (*doc)["hour"] = hourToRead;
@@ -126,6 +130,9 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
       
       //Row counter to limit the number of rows read to fit within the MQTT message buffer size
       uint16_t rowCounter = 0;
+
+      uint64_t previousTime = 0;
+
       while(logFile.available()){
         uint64_t dataTime = 0;
         uint32_t dataNodeID = 0;
@@ -145,14 +152,17 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
         data = strtoull(field, NULL, 10);
 
         //If the data matches the node and message ID, and the time is within the interval, add it to the JSON doc
-        if(dataNodeID == nodeID && dataMessageID == messageID && dataTime >= intervalStartTime && rowCounter < 500){
-          JsonObject nestedObject = history.createNestedObject();
-          nestedObject["time"] = dataTime;
-          nestedObject["data"] = data;
-          rowCounter++;
+        if(dataNodeID == nodeID && dataMessageID == messageID && dataTime >= intervalStartTime && rowCounter < 500 && dataTime >= previousTime + decimationInterval){    
+            JsonObject nestedObject = history.createNestedObject();
+            nestedObject["time"] = dataTime;
+            nestedObject["data"] = data;
+            rowCounter++;
+            previousTime = dataTime;
         }
 
       }
+      logFile.close();
+      Serial.println("File records sent: " + String(rowCounter)); 
     }
     else{
       Serial.println("Log file does not exist, skipping: " + String(filename));

@@ -26,7 +26,7 @@ void initSDCard();
 //Write log data to the SD card, creating a new log file if needed
 void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationFirmwareVersion, uint8_t nodeID, uint16_t messageID, uint64_t data);
 
-uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint64_t hourToRead, uint64_t intervalStartTime, JsonDocument *doc);
+uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint64_t hourToRead, uint64_t intervalStartTime, JsonDocument *doc, uint32_t decimationInterval);
 
 uint8_t parseLogDataField(File *file, char* field, size_t maxFieldLength);
 
