@@ -500,6 +500,24 @@ void setup() {
 
     pinMode(11, OUTPUT); //CAN Bus Power
 
+    
+    Wire.begin(I2C_SDA, I2C_SCL);
+    
+    if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+      Serial.println(F("SSD1306 allocation failed"));
+      for(;;); // Don't proceed, loop forever
+      }
+
+    // Show initial display buffer contents on the screen --
+    // the library initializes this with an Adafruit splash screen.
+    display.display();
+    delay(1000); // Pause for 1 seconds
+
+
+
+
+    Serial.println(F("Initialized LCD Screen"));
+
     if (!LittleFS.begin(0)) {
       Serial.println("LittleFS Mount Failed");
       //TODO: stall startup here
@@ -556,6 +574,7 @@ void setup() {
     
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wm;
+    
     WiFiManagerParameter mqtt_header_text("<h4>MQTT Broker Login</h4>");
 
     WiFiManagerParameter custom_mqtt_server("server", "MQTT Server", mqtt_server, 255);
@@ -565,6 +584,8 @@ void setup() {
     WiFiManagerParameter email_header_text("<h4>Email Alert Recipients</h4>");
     WiFiManagerParameter custom_email_recipient("email", "Email Recipient", email_recipient, 255);
     WiFiManagerParameter custom_email_recipient_name("email_name", "Email Recipient Name", email_recipient_name, 255);
+
+    wm.setAPStaticIPConfig(IPAddress(10,10,1,1), IPAddress(10,10,1,1), IPAddress(255,255,255,0));
 
     wm.setSaveConfigCallback(saveConfigCallback);
 
@@ -588,6 +609,53 @@ void setup() {
 
    bool res;
     //TODO generate a unique name for the base station based on the system ID and base station ID
+
+    // Call back function to be called when the WiFiManager enters configuration mode
+    wm.setAPCallback([](WiFiManager *myWiFiManager) {
+      Serial.println("Entered config mode");
+      Serial.println(WiFi.softAPIP());
+      Serial.println(myWiFiManager->getConfigPortalSSID());
+      
+/*       display.clearDisplay();
+      display.setTextSize(2);
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(4,4);
+      display.println(WiFi.softAPIP());
+      display.setTextSize(1);
+      display.setCursor(0, 20);
+      display.println("123456789012345");
+      display.setCursor(0, 28);
+      display.println("123456789012345");
+      display.setCursor(0, 36);
+      display.println("123456789012345678901234567890");
+      display.display(); */
+      display.clearDisplay();
+
+      display.setTextSize(2); // Draw 2X-scale text
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(10, 0);
+      display.println(F("scroll"));
+      display.display();      // Show initial text
+      delay(100);
+
+      // Scroll in various directions, pausing in-between:
+      display.startscrollright(0x00, 0x0F);
+      delay(2000);
+      display.stopscroll();
+      delay(1000);
+      display.startscrollleft(0x00, 0x0F);
+      delay(2000);
+      display.stopscroll();
+      delay(1000);
+      display.startscrolldiagright(0x00, 0x07);
+      delay(2000);
+      display.startscrolldiagleft(0x00, 0x07);
+      delay(2000);
+      display.stopscroll();
+      delay(1000);
+
+    });
+
     res = wm.autoConnect("Project Fish Works Base Station");
     if(!res) {
         Serial.println("Failed to connect");
@@ -684,29 +752,6 @@ void setup() {
     //LCD Screen Setup Stuffs part 2  
 
     
-  Wire.begin(I2C_SDA, I2C_SCL);
-  
-  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
-    }
-
-  // Show initial display buffer contents on the screen --
-  // the library initializes this with an Adafruit splash screen.
-  display.display();
-  delay(2000); // Pause for 2 seconds
-
-  // Clear the buffer
-  display.clearDisplay();
-
-  // Draw a single pixel in white
-  display.drawPixel(10, 10, SSD1306_WHITE);
-
-  // Show the display buffer on the screen. You MUST call display() after
-  // drawing commands to make them visible on screen!
-  display.display();
-  delay(2000);
-  Serial.println(F("Initialized"));
 
 }
 
