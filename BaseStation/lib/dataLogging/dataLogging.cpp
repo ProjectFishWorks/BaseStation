@@ -41,10 +41,10 @@ void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationF
   String logData = getLogDataRow(nodeID, messageID, data);
   File logFile;
   char filename[255];
-  getCurrentLogFilename(filename, systemID, baseStationID);
+  getCurrentLogFilename(filename, systemID, baseStationID,messageID);
   // //TODO: For when we get the log file queue working, for now just write directly to the file
   // //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
-  openLogFile(&logFile, systemID, baseStationID, String(baseStationFirmwareVersion));
+  openLogFile(&logFile, systemID, baseStationID, messageID, String(baseStationFirmwareVersion));
   logFile.println(logData);
   // Serial.println("Wrote to log file : " + logData);
   logFile.close();
@@ -116,7 +116,7 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
     //Get the filename for the log file
     struct tm timeinfo;
     localtime_r(&now, &timeinfo);
-    getLogFilename(filename, systemID, baseStationID, timeinfo);
+    getLogFilename(filename, systemID, baseStationID, messageID, timeinfo);
 
     if(SD.exists(filename)) {
 
@@ -136,7 +136,6 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
       while(logFile.available()){
         uint64_t dataTime = 0;
         uint32_t dataNodeID = 0;
-        uint32_t dataMessageID = 0;
         uint64_t data = 0;
 
         uint8_t fieldLength = 0;
@@ -147,12 +146,10 @@ uint8_t readLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, u
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
         dataNodeID = strtoul(field, NULL, 10);
         parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
-        dataMessageID = strtoul(field, NULL, 10);
-        parseLogDataField(&logFile, field, MAX_LOG_FILE_FIELD_LENGTH);
         data = strtoull(field, NULL, 10);
 
         //If the data matches the node and message ID, and the time is within the interval, add it to the JSON doc
-        if(dataNodeID == nodeID && dataMessageID == messageID && dataTime >= intervalStartTime && rowCounter < 500 && dataTime >= previousTime + decimationInterval){    
+        if(dataNodeID == nodeID && dataTime >= intervalStartTime && rowCounter < 500 && dataTime >= previousTime + decimationInterval){    
             JsonObject nestedObject = history.createNestedObject();
             nestedObject["time"] = dataTime;
             nestedObject["data"] = data;
@@ -192,7 +189,7 @@ uint8_t parseLogDataField(File *file, char* field, size_t maxFieldLength) {
   }
 }
 
-void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, tm timeinfo){
+void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, uint16_t messageID, tm timeinfo){
 
   //Buffer to hold the current date/time
   char timeString[255];
@@ -200,7 +197,7 @@ void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, t
   strftime(timeString, 255, "-%Y-%m-%d-%H.csv", &timeinfo);
 
   //Combine the date/time with system and base station ID
-  String filenameString = "/log-" + String(systemID) + "-" + String(baseStationID) + timeString;;
+  String filenameString = "/log-" + String(systemID) + "-" + String(baseStationID) + "-" + String(messageID) + timeString;
 
   //Copy the final string to the filename pointer
   filenameString.toCharArray(filename, filenameString.length() + 1);
@@ -208,7 +205,7 @@ void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, t
 }
 //Get the current log file name based on the current time
 //Currently creates one log file per hour
-void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID){
+void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, uint16_t messageID) {
   //Time object
   struct tm timeinfo;
   //If we can't get the current time, add a default filename
@@ -218,34 +215,35 @@ void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStati
     return;
   }
 
-  getLogFilename(filename, systemID, baseStationID, timeinfo);
+  getLogFilename(filename, systemID, baseStationID, messageID, timeinfo);
   
 }
 
 //Write the header info to the log file
-void writeLogHeader(File *file, uint16_t systemID, uint16_t baseStationID, String baseStationFirmwareVersion) {
+void writeLogHeader(File *file, uint16_t systemID, uint16_t baseStationID, uint16_t messageID, String baseStationFirmwareVersion) {
   file->println(("SystemID," + String(systemID)));
   file->println("BaseStationID," + String(baseStationID));
+  file->println("MessageID," + String(messageID));
   file->println("BaseStationFirmwareVersion," + baseStationFirmwareVersion);
 
   time_t now;
   time(&now);
   file->println("Created," + String(now));
-  file->println("Time,NodeID,MessageID,Data");
+  file->println("Time,NodeID,Data");
 }
 
 //Creates a row of data for the log file
 String getLogDataRow(uint8_t nodeID, uint16_t messageID, uint64_t data) {
   time_t now;
   time(&now);
-  return String(now) + "," + String(nodeID) + "," + String(messageID) + "," + String(data);
+  return String(now) + "," + String(nodeID) + "," + String(data);
 }
 
 //Open the log file and creates a new one if it doesn't exist
-void openLogFile(File *file, uint16_t systemID, uint16_t baseStationID, String baseStationFirmwareVersion) {
+void openLogFile(File *file, uint16_t systemID, uint16_t baseStationID, uint16_t messageID, String baseStationFirmwareVersion) {
   //Get the current filename based on the current time
   char filename[255];
-  getCurrentLogFilename(filename, systemID, baseStationID);
+  getCurrentLogFilename(filename, systemID, baseStationID, messageID);
 
   //If the file exists, open it in append mode, otherwise create a new file
   if(SD.exists(filename)) {
@@ -253,7 +251,7 @@ void openLogFile(File *file, uint16_t systemID, uint16_t baseStationID, String b
   } else {
     Serial.println("Log file does not exist, creating new file with filename: " + String(filename));
     *file = SD.open(filename, FILE_WRITE);
-    writeLogHeader(file, systemID, baseStationID, baseStationFirmwareVersion);
+    writeLogHeader(file, systemID, baseStationID, messageID, baseStationFirmwareVersion);
   }
 }
 
