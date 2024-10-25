@@ -23,6 +23,7 @@
 #include <Adafruit_SSD1306.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <Adafruit_INA219.h>
 
 #include "FS.h"
 #include <LittleFS.h>
@@ -87,11 +88,14 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 
-int I2C_SDA = 18;
-int I2C_SCL = 19;
+int LCD_SDA = 18;
+int LCD_SCL = 19;
+int CUR_SDA = 9;
+int CUR_SCL = 10;
 
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_INA219 ina219(0x4A);
 
 #define NUMFLAKES     3 // Number of snowflakes in the animation example
 
@@ -476,9 +480,39 @@ void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h) {
   }
 }
 
-void testLCDScreen () {
-  Serial.println("Test draw animate");
-  testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT);    // Draw a small bitmap image
+void testCurrentSense () {
+  Serial.println("Test current sense");
+  float shuntvoltage = 0;
+  float busvoltage = 0;
+  float current_mA = 0;
+  float loadvoltage = 0;
+  float power_mW = 0;
+
+  shuntvoltage = ina219.getShuntVoltage_mV();
+  busvoltage = ina219.getBusVoltage_V();
+  current_mA = ina219.getCurrent_mA();
+  power_mW = ina219.getPower_mW();
+  loadvoltage = busvoltage + (shuntvoltage / 1000);
+  
+  Serial.print("Bus Voltage:   "); Serial.print(busvoltage); Serial.println(" V");
+  Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage); Serial.println(" mV");
+  Serial.print("Load Voltage:  "); Serial.print(loadvoltage); Serial.println(" V");
+  Serial.print("Current:       "); Serial.print(current_mA); Serial.println(" mA");
+  Serial.print("Power:         "); Serial.print(power_mW); Serial.println(" mW");
+  Serial.println("");
+
+  display.clearDisplay();
+  display.setTextSize(2); // Draw 2X-scale text
+  display.setCursor(1, 10);
+  display.println(F("Current is:"));
+  display.setTextSize(1); // Draw 1X-scale text
+  display.setCursor(1, 30);
+  display.print(current_mA);
+  display.print(" mA");
+  display.display();      // Show initial text
+  delay(2000);
+
+  //testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT);    // Draw a small bitmap image
   Serial.println("Success");
 }
 //Yeah, There is lots of it.
@@ -495,12 +529,22 @@ void setup() {
     pinMode(11, OUTPUT); //CAN Bus Power
 
     
-    Wire.begin(I2C_SDA, I2C_SCL);
+    Wire.begin(LCD_SDA, LCD_SCL);
+    Wire1.begin(CUR_SDA, CUR_SCL);
+    //I2Cone.begin(LCD_SDA, LCD_SCL);
+    //I2Ctwo.begin(CUR_SDA, CUR_SCL);
     
     if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
       Serial.println(F("SSD1306 allocation failed"));
       for(;;); // Don't proceed, loop forever
       }
+    if (! ina219.begin(&Wire1)) {
+      Serial.println("Failed to find INA219 chip");
+      while (1) { delay(10); }
+    }
+
+
+    ina219.setCalibration_32V_2A();
 
     // Show initial display buffer contents on the screen --
     // the library initializes this with an Adafruit splash screen.
@@ -811,7 +855,7 @@ void loop() {
     if (digitalRead(21) == LOW) {
       Serial.println("Button 21 pressed");
       annoyingBuzz();
-      testLCDScreen();
+      testCurrentSense();
       testdrawbitmap();
       //latching debounce
       while(digitalRead(21) == LOW){
