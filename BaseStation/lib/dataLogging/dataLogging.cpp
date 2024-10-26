@@ -83,7 +83,7 @@ void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint
     Serial.println("Sending log data to MQTT topic: " + topic);
     client->publish(topic.c_str(), doc.as<String>().c_str());
 
-    client->loop();
+    delay(10);
 
     doc.clear();
     currentHour -= 3600;
