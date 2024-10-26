@@ -142,7 +142,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
 
     writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
 
-    mqttClient.loop();
+    //mqttClient.loop();
 
     Adafruit_SSD1306 display;
     Adafruit_INA219 ina219;
@@ -288,7 +288,7 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
     }
 
     //Log the message to the SD card
-    mqttClient.loop();
+    //mqttClient.loop();
     //writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
 
   }
