@@ -3,20 +3,12 @@
 
 #include "credential.h"
 
-#include "baseStationUI.h"
-
 #include <WiFi.h>
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 
 #include "WiFiClientSecure.h"
 
 #include <BaseStationCore.h>
-#include <Adafruit_NeoPixel.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-//#include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_INA219.h>
 
 #include <PubSubClient.h>
 
@@ -26,6 +18,12 @@
 
 #include <dataLogging.h>
 
+#include <Adafruit_NeoPixel.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_INA219.h>
 
 #include "FS.h"
 #include <LittleFS.h>
@@ -65,8 +63,61 @@ char email_recipient_name[255] = "Sebastien Robitaille";
 //flag for saving data
 bool shouldSaveConfig = false;
 
-//Error stuff for Base Station UI
-int errorCueFlag = 0;
+
+//NeoPixel Setup Stuffs
+#define PIN         45 // On Trinket or Gemma, suggest changing this to 1
+// How many NeoPixels are attached to the Arduino?
+#define NUMPIXELS   2 // Popular NeoPixel ring size
+// When setting up the NeoPixel library, we tell it how many pixels,
+// and which pin to use to send signals. Note that for older NeoPixel
+// strips you might need to change the third parameter -- see the
+// strandtest example for more information on possible values.
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
+#define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
+
+
+//LCD Screen Setup Stuffs
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+// The pins for I2C are defined by the Wire-library. 
+// On an arduino UNO:       A4(SDA), A5(SCL)
+// On an arduino MEGA 2560: 20(SDA), 21(SCL)
+// On an arduino LEONARDO:   2(SDA),  3(SCL), ...
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+
+int LCD_SDA = 18;
+int LCD_SCL = 19;
+int CUR_SDA = 9;
+int CUR_SCL = 10;
+
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_INA219 ina219(0x4A);
+
+#define NUMFLAKES     3 // Number of snowflakes in the animation example
+
+#define LOGO_HEIGHT   16
+#define LOGO_WIDTH    16
+static const unsigned char PROGMEM logo_bmp[] =
+{ 0b00000000, 0b11000000,
+  0b00000001, 0b11000000,
+  0b00000001, 0b11000000,
+  0b00000011, 0b11100000,
+  0b11110011, 0b11100000,
+  0b11111110, 0b11111000,
+  0b01111110, 0b11111111,
+  0b00110011, 0b10011111,
+  0b00011111, 0b11111100,
+  0b00001101, 0b01110000,
+  0b00011011, 0b10100000,
+  0b00111111, 0b11100000,
+  0b00111111, 0b11110000,
+  0b01111100, 0b11110000,
+  0b01110000, 0b01110000,
+  0b00000000, 0b00110000 };
 
 
 //callback notifying us of the need to save config
@@ -144,9 +195,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
 
     //mqttClient.loop();
 
-    Adafruit_SSD1306 display;
-    Adafruit_INA219 ina219;
-    Adafruit_NeoPixel pixels;
+
 
 }
 
@@ -355,17 +404,181 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 
 }
 
+void annoyingBuzz() {
+  //for(int i = 0; i < 1; i++){
+    digitalWrite(48, HIGH);
+    Serial.println("Bzzzzz");
+    delay(50);
+    digitalWrite(48, LOW);
+    //delay(100);
+  //}
+}
 
+//Test stuff for LCD Screen
+void testdrawbitmap(void) {
+  display.clearDisplay();
+
+  display.drawBitmap(
+    (display.width()  - LOGO_WIDTH ) / 2,
+    (display.height() - LOGO_HEIGHT) / 2,
+    logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+  display.display();
+}
+
+#define XPOS   0 // Indexes into the 'icons' array in function below
+#define YPOS   1
+#define DELTAY 2
+
+void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h) {
+  int8_t f, icons[NUMFLAKES][3];
+
+  // Initialize 'snowflake' positions
+  for(f=0; f< NUMFLAKES; f++) {
+    icons[f][XPOS]   = random(1 - LOGO_WIDTH, display.width());
+    icons[f][YPOS]   = -LOGO_HEIGHT;
+    icons[f][DELTAY] = random(1, 6);
+    Serial.print(F("x: "));
+    Serial.print(icons[f][XPOS], DEC);
+    Serial.print(F(" y: "));
+    Serial.print(icons[f][YPOS], DEC);
+    Serial.print(F(" dy: "));
+    Serial.println(icons[f][DELTAY], DEC);
+  }
+
+  for(int i=0; i<50; i++) { // Loop forever...
+    display.clearDisplay(); // Clear the display buffer
+
+    // Draw each snowflake:
+    for(f=0; f< NUMFLAKES; f++) {
+      display.drawBitmap(icons[f][XPOS], icons[f][YPOS], bitmap, w, h, SSD1306_WHITE);
+    }
+
+    display.display(); // Show the display buffer on the screen
+    delay(200);        // Pause for 1/10 second
+
+    // Then update coordinates of each flake...
+    for(f=0; f< NUMFLAKES; f++) {
+      icons[f][YPOS] += icons[f][DELTAY];
+      // If snowflake is off the bottom of the screen...
+      if (icons[f][YPOS] >= display.height()) {
+        // Reinitialize to a random position, just off the top
+        icons[f][XPOS]   = random(1 - LOGO_WIDTH, display.width());
+        icons[f][YPOS]   = -LOGO_HEIGHT;
+        icons[f][DELTAY] = random(1, 6);
+      }
+    }
+  }
+}
+
+void testCurrentSense () {
+  Serial.println("Test current sense");
+  float shuntvoltage = 0;
+  float busvoltage = 0;
+  float current_mA = 0;
+  float loadvoltage = 0;
+  float power_mW = 0;
+
+  shuntvoltage = ina219.getShuntVoltage_mV();
+  busvoltage = ina219.getBusVoltage_V();
+  current_mA = ina219.getCurrent_mA();
+  power_mW = ina219.getPower_mW();
+  loadvoltage = busvoltage + (shuntvoltage / 1000);
+  
+  Serial.print("Bus Voltage:   "); Serial.print(busvoltage); Serial.println(" V");
+  Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage); Serial.println(" mV");
+  Serial.print("Load Voltage:  "); Serial.print(loadvoltage); Serial.println(" V");
+  Serial.print("Current:       "); Serial.print(current_mA); Serial.println(" mA");
+  Serial.print("Power:         "); Serial.print(power_mW); Serial.println(" mW");
+  Serial.println("");
+
+  display.clearDisplay();
+  display.setTextSize(2); // Draw 2X-scale text
+  display.setCursor(1, 10);
+  display.println(F("Current is:"));
+  display.setTextSize(1); // Draw 1X-scale text
+  display.setCursor(1, 30);
+  display.print(current_mA);
+  display.print(" mA");
+  display.display();      // Show initial text
+  delay(2000);
+
+  //testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT);    // Draw a small bitmap image
+  Serial.println("Success");
+}
+//Yeah, There is lots of it.
 
 void setup() {
     //Start the serial connection
     Serial.begin(115200);
 
+    pinMode(0, INPUT_PULLUP);  //Program button with pullup
+    pinMode(21, INPUT_PULLUP); //ButtBlue
+    pinMode(47, INPUT_PULLUP); //ButtWhite
+    pinMode(48, OUTPUT); //Buzzer
 
-    //Initialize the Base Station UI
-    initBaseStationUI();
+    pinMode(11, OUTPUT); //CAN Bus Power
+    digitalWrite(11, LOW);
 
     
+    Wire.begin(LCD_SDA, LCD_SCL);
+    Wire1.begin(CUR_SDA, CUR_SCL);
+    //I2Cone.begin(LCD_SDA, LCD_SCL);
+    //I2Ctwo.begin(CUR_SDA, CUR_SCL);
+    
+    if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+      Serial.println(F("SSD1306 allocation failed"));
+      for(;;); // Don't proceed, loop forever
+      }
+    if (! ina219.begin(&Wire1)) {
+      Serial.println("Failed to find INA219 chip");
+      while (1) { delay(10); }
+    }
+    ina219.setCalibration_16V_400mA();
+
+
+
+    // Show initial display buffer contents on the screen --
+    // the library initializes this with an Adafruit splash screen.
+    display.clearDisplay();
+    display.drawBitmap(
+      (display.width()  - LOGO_WIDTH ) / 2,
+      (display.height() - LOGO_HEIGHT) / 2,
+      logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
+    display.display();
+    Serial.println(F("Initialized LCD Screen"));
+
+
+    //NeoPixel Setup Stuffs part 2
+    #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
+    clock_prescale_set(clock_div_1);
+    #endif
+    pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
+    pixels.clear(); // Set all pixel colors to 'off'
+    for (int i=0; i<NUMPIXELS; i++){
+      pixels.setPixelColor(i, pixels.Color(150, 150, 0));
+      //pixels.setPixelColor(1, pixels.Color(0, 150, 0));
+    }
+    pixels.show(); // Set all pixels to yellow
+    Serial.println(F("Initialized NeoPixel"));
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 10);
+    display.println(F("Begining Boot..."));
+    display.setCursor(20, 30);
+    display.println(F("Welcome to:"));
+    display.display(); // Show initial text
+    delay(1000);
+    display.clearDisplay();
+    display.setTextSize(2); // Draw 2X-scale text
+    display.setCursor(1, 10);
+    display.println(F("Fish Sense"));
+    display.setTextSize(1); // Draw 1X-scale text
+    display.setCursor(1, 30);
+    display.println(F("by Project FishWorks"));
+    display.display();      // Show initial text
+    delay(2000);
+
     if (!LittleFS.begin(0)) {
       Serial.println("LittleFS Mount Failed");
       //TODO: stall startup here
@@ -373,8 +586,8 @@ void setup() {
     }
 
     Serial.println("LittleFS Mount Successful");
-    //pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status neopixel to green
-    //pixels.show(); // Set status pixel to green
+    pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status neopixel to green
+    pixels.show(); // Set status pixel to green
     delay(500);
 
     if(LittleFS.exists(mqttConfigFileName)) {
@@ -466,7 +679,31 @@ void setup() {
       Serial.println("Entered config mode");
       Serial.println(WiFi.softAPIP());
       Serial.println(myWiFiManager->getConfigPortalSSID());
-      configModeUI(String(myWiFiManager->getConfigPortalSSID()));
+
+      pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to red
+      pixels.show(); // Set status pixel to red
+
+      display.clearDisplay();
+      display.setTextSize(1); // Draw 2X-scale text
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(5, 5);
+      display.println(F("Didnt Connect Wifi!"));
+      display.setCursor(5, 14);
+      display.println(F("Please connect to:"));
+      display.setCursor(5, 23);
+      display.print(F("< "));
+      display.print(myWiFiManager->getConfigPortalSSID());
+      display.println(F(" >"));
+      display.setCursor(5, 32);
+      display.println(F("to enter your WiFi"));
+      display.setCursor(5, 41);
+      display.println(("at the web page: "));
+      display.setCursor(5, 50);
+      display.print(F("http://"));
+      display.println(WiFi.softAPIP());
+
+      display.display();      // Show initial text
+      //display.startscrollleft(0x00, 0xFF);
       delay(200);
 
     });
@@ -486,8 +723,8 @@ void setup() {
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
-        //pixels.setPixelColor(1, pixels.Color(150, 0, 0)); //Turn status pixel to green
-        //pixels.show(); // Set status pixel to green
+        pixels.setPixelColor(1, pixels.Color(150, 0, 0)); //Turn status pixel to green
+        pixels.show(); // Set status pixel to green
         delay(500);
     }
 
@@ -560,11 +797,28 @@ void setup() {
     digitalWrite(3, HIGH); //Turn on the LCD Backlight
     digitalWrite(19, HIGH); //Keep LCD on
 
-
-    writeToLCD2lines("Boot Successful", "System Online");
-
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 10);
+    display.println(F("Boot Successful"));
+    display.setCursor(20, 30);
+    display.println(F("System Online"));
+    display.display(); // Show initial text
     delay(3000);
-    
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 10);
+    display.println(F("Entering Standby"));
+    display.setCursor(20, 30);
+    display.println(F("Good Night~~"));
+    display.display(); // Show initial text
+    delay(1000);
+    testdrawbitmap();
+    pixels.setPixelColor(0, pixels.Color(40, 0, 0)); //Dim pwr pixel
+    pixels.setPixelColor(1, pixels.Color(0, 0, 0)); //Turn off status pixel
+    pixels.show(); // Set all pixels
 
     //LCD Screen Setup Stuffs part 2  
 
@@ -597,7 +851,7 @@ void loop() {
       Serial.println("Button 21 pressed");
       annoyingBuzz();
       testCurrentSense();
-      drawBitmap();
+      testdrawbitmap();
       //latching debounce
       while(digitalRead(21) == LOW){
         delay(50);
@@ -607,18 +861,19 @@ void loop() {
       Serial.println("Button 47 pressed");
       //laching debounce
       while(digitalRead(47) == LOW){
-        writeToPixel(1, 0, 150, 0);
-        delay(DELAYVAL);
-        writeToPixel(1, 150, 0, 0);
-        delay(DELAYVAL);
-        writeToPixel(1, 0, 0, 150);
-        delay(DELAYVAL);
+          pixels.setPixelColor(1, pixels.Color(0, 150, 0));
+          delay(DELAYVAL); // Pause before next pass through loop
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+          delay(DELAYVAL); // Pause before next pass through loop
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          pixels.setPixelColor(1, pixels.Color(0, 0, 150));
+          delay(DELAYVAL); // Pause before next pass through loop
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(500);
     }
-    //pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    //pixels.show(); // Set status pixel colour to 'off'
-    }
-    if (errorCueFlag == 0) {
-      sleepModeUI();
+    pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+    pixels.show(); // Set status pixel colour to 'off'
     }
 }
 
