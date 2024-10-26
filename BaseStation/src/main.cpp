@@ -400,20 +400,6 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 
 }
 
-void backlightToggle() {
-  Serial.println("Toggling Backlight");
-  if (digitalRead(3) == HIGH) {
-    digitalWrite(3, LOW);
-  } else {
-    digitalWrite(3, HIGH);
-  }
-  if (digitalRead(3) == HIGH) {
-    Serial.println("Backlight On");
-  } else {
-    Serial.println("Backlight Off");
-  }
-}
-
 void annoyingBuzz() {
   //for(int i = 0; i < 1; i++){
     digitalWrite(48, HIGH);
@@ -542,9 +528,9 @@ void setup() {
       Serial.println("Failed to find INA219 chip");
       while (1) { delay(10); }
     }
+    ina219.setCalibration_16V_400mA();
 
 
-    ina219.setCalibration_32V_2A();
 
     // Show initial display buffer contents on the screen --
     // the library initializes this with an Adafruit splash screen.
