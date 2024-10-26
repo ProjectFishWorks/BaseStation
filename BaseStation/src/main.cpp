@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x02
+#define baseStationID 0x00
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -140,7 +140,10 @@ QueueHandle_t log_file_queue;
 #define LOG_FILE_QUEUE_LENGTH 10
 
 //Global data fix for pointer issues, TODO fix this shit
-uint64_t data = 0;
+//uint64_t data = 0;
+
+//MQTT Loop Task
+void mqttLoop(void* _this); 
 
 //Function that is called when a CAN Bus message is received
 void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
@@ -210,6 +213,7 @@ void MQTTConnect() {
     if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
       //Subscribe to the MQTT topic for this base station
+
       String topicIn = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
       String topicHistory = "historyIn/" + String(systemID) + "/" + String(baseStationID) + "/#";
       String topicManifest = "manifestIn/" + String(systemID) + "/" + String(baseStationID);
@@ -263,13 +267,13 @@ void MQTTConnect() {
 }
 
 void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
+/*   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
-  Serial.println();
+  Serial.println(); */
 
   //Parse the topic to get the node ID and message ID with the format:
   // in/systemID/baseStationID/nodeID/messageID/
@@ -305,7 +309,7 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 
   //Don't use doc["data"].as<uint64_t>() because it will cause a zero to be sent over the CAN bus
   //TODO fix this global variable hack
-  data = doc["data"];
+  uint64_t data = doc["data"];
   Serial.print("Data: ");
   Serial.println(data);
 
@@ -333,8 +337,8 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
     }
 
     //Log the message to the SD card
-
-    writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+    mqttClient.loop();
+    //writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
 
   }
   //History message
@@ -513,6 +517,7 @@ void setup() {
     pinMode(48, OUTPUT); //Buzzer
 
     pinMode(11, OUTPUT); //CAN Bus Power
+    digitalWrite(11, LOW);
 
     
     Wire.begin(LCD_SDA, LCD_SCL);
@@ -759,7 +764,8 @@ void setup() {
     // Start the Node Controller
     //Set the WiFi client to use the CA certificate from HiveMQ
     //Got it from here: https://community.hivemq.com/t/frequently-asked-questions-hivemq-cloud/514
-    espClient.setCACert(CA_cert);  
+    //espClient.setCACert(CA_cert);
+    espClient.setInsecure();  
 
     //Set the MQTT server and port
     mqttClient.setServer(mqtt_server, 8883);
@@ -787,7 +793,6 @@ void setup() {
         Serial.println("Node Controller Core Failed to Start");
     }
 
-    digitalWrite(11, HIGH); //Turn on the CAN Bus power
     digitalWrite(48, LOW); //Turn off the buzzer
     digitalWrite(3, HIGH); //Turn on the LCD Backlight
     digitalWrite(19, HIGH); //Keep LCD on
@@ -817,6 +822,14 @@ void setup() {
 
     //LCD Screen Setup Stuffs part 2  
 
+    xTaskCreatePinnedToCore(
+        mqttLoop,   /* Function to implement the task */
+        "mqttLoop", /* Name of the task */
+        10000,      /* Stack size in words */
+        NULL,       /* Task input parameter */
+        1,          /* Priority of the task */
+        NULL,       /* Task handle. */
+        0);         /* Core where the task should run */
     
 
 }
@@ -824,11 +837,7 @@ void setup() {
 void loop() {
 
     //TODO: Move the MQTT connection to a separate task
-    //If the MQTT is not connected, or has disconnect4ed for some reason, connect to the MQTT broker
-    if (!mqttClient.connected()) {
-        MQTTConnect();
-    }
-    mqttClient.loop();
+
 
     emailClientLoop(email_recipient, email_recipient_name);
 
@@ -867,3 +876,16 @@ void loop() {
     pixels.show(); // Set status pixel colour to 'off'
     }
 }
+
+void mqttLoop(void* _this){
+  Serial.println("Starting MQTT Loop");
+  while(1){
+    //If the MQTT is not connected, or has disconnect4ed for some reason, connect to the MQTT broker
+    if (!mqttClient.connected()) {
+        //digitalWrite(11, LOW);
+        MQTTConnect();
+    }
+    mqttClient.loop();
+    delay(10);
+  }
+} 
