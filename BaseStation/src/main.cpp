@@ -23,6 +23,7 @@
 #include <Adafruit_SSD1306.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <Adafruit_INA219.h>
 
 #include "FS.h"
 #include <LittleFS.h>
@@ -71,7 +72,7 @@ bool shouldSaveConfig = false;
 // and which pin to use to send signals. Note that for older NeoPixel
 // strips you might need to change the third parameter -- see the
 // strandtest example for more information on possible values.
-Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 #define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
 
 
@@ -87,13 +88,16 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 
-int I2C_SDA = 18;
-int I2C_SCL = 19;
+int LCD_SDA = 18;
+int LCD_SCL = 19;
+int CUR_SDA = 9;
+int CUR_SCL = 10;
 
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_INA219 ina219(0x4A);
 
-#define NUMFLAKES     10 // Number of snowflakes in the animation example
+#define NUMFLAKES     3 // Number of snowflakes in the animation example
 
 #define LOGO_HEIGHT   16
 #define LOGO_WIDTH    16
@@ -433,7 +437,6 @@ void testdrawbitmap(void) {
     (display.height() - LOGO_HEIGHT) / 2,
     logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
   display.display();
-  delay(1000);
 }
 
 #define XPOS   0 // Indexes into the 'icons' array in function below
@@ -456,7 +459,7 @@ void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h) {
     Serial.println(icons[f][DELTAY], DEC);
   }
 
-  for(;;) { // Loop forever...
+  for(int i=0; i<50; i++) { // Loop forever...
     display.clearDisplay(); // Clear the display buffer
 
     // Draw each snowflake:
@@ -481,15 +484,40 @@ void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h) {
   }
 }
 
-void testLCDScreen () {
-  testdrawbitmap();    // Draw a small bitmap image
-  Serial.println("Test draw bitmap");
-  // Invert and restore display, pausing in-between
+void testCurrentSense () {
+  Serial.println("Test current sense");
+  float shuntvoltage = 0;
+  float busvoltage = 0;
+  float current_mA = 0;
+  float loadvoltage = 0;
+  float power_mW = 0;
 
-  delay(1000);
+  shuntvoltage = ina219.getShuntVoltage_mV();
+  busvoltage = ina219.getBusVoltage_V();
+  current_mA = ina219.getCurrent_mA();
+  power_mW = ina219.getPower_mW();
+  loadvoltage = busvoltage + (shuntvoltage / 1000);
+  
+  Serial.print("Bus Voltage:   "); Serial.print(busvoltage); Serial.println(" V");
+  Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage); Serial.println(" mV");
+  Serial.print("Load Voltage:  "); Serial.print(loadvoltage); Serial.println(" V");
+  Serial.print("Current:       "); Serial.print(current_mA); Serial.println(" mA");
+  Serial.print("Power:         "); Serial.print(power_mW); Serial.println(" mW");
+  Serial.println("");
+
+  display.clearDisplay();
+  display.setTextSize(2); // Draw 2X-scale text
+  display.setCursor(1, 10);
+  display.println(F("Current is:"));
+  display.setTextSize(1); // Draw 1X-scale text
+  display.setCursor(1, 30);
+  display.print(current_mA);
+  display.print(" mA");
+  display.display();      // Show initial text
+  delay(2000);
+
+  //testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT);    // Draw a small bitmap image
   Serial.println("Success");
-  testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT); // Animate bitmaps
-  Serial.println("Test animate");
 }
 //Yeah, There is lots of it.
 
@@ -506,22 +534,64 @@ void setup() {
     digitalWrite(11, LOW);
 
     
-    Wire.begin(I2C_SDA, I2C_SCL);
+    Wire.begin(LCD_SDA, LCD_SCL);
+    Wire1.begin(CUR_SDA, CUR_SCL);
+    //I2Cone.begin(LCD_SDA, LCD_SCL);
+    //I2Ctwo.begin(CUR_SDA, CUR_SCL);
     
     if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
       Serial.println(F("SSD1306 allocation failed"));
       for(;;); // Don't proceed, loop forever
       }
+    if (! ina219.begin(&Wire1)) {
+      Serial.println("Failed to find INA219 chip");
+      while (1) { delay(10); }
+    }
+
+
+    ina219.setCalibration_32V_2A();
 
     // Show initial display buffer contents on the screen --
     // the library initializes this with an Adafruit splash screen.
+    display.clearDisplay();
+    display.drawBitmap(
+      (display.width()  - LOGO_WIDTH ) / 2,
+      (display.height() - LOGO_HEIGHT) / 2,
+      logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
     display.display();
-    delay(1000); // Pause for 1 seconds
-
-
-
-
     Serial.println(F("Initialized LCD Screen"));
+
+
+    //NeoPixel Setup Stuffs part 2
+    #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
+    clock_prescale_set(clock_div_1);
+    #endif
+    pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
+    pixels.clear(); // Set all pixel colors to 'off'
+    for (int i=0; i<NUMPIXELS; i++){
+      pixels.setPixelColor(i, pixels.Color(150, 150, 0));
+      //pixels.setPixelColor(1, pixels.Color(0, 150, 0));
+    }
+    pixels.show(); // Set all pixels to yellow
+    Serial.println(F("Initialized NeoPixel"));
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 10);
+    display.println(F("Begining Boot..."));
+    display.setCursor(20, 30);
+    display.println(F("Welcome to:"));
+    display.display(); // Show initial text
+    delay(1000);
+    display.clearDisplay();
+    display.setTextSize(2); // Draw 2X-scale text
+    display.setCursor(1, 10);
+    display.println(F("Fish Sense"));
+    display.setTextSize(1); // Draw 1X-scale text
+    display.setCursor(1, 30);
+    display.println(F("by Project FishWorks"));
+    display.display();      // Show initial text
+    delay(2000);
 
     if (!LittleFS.begin(0)) {
       Serial.println("LittleFS Mount Failed");
@@ -530,6 +600,9 @@ void setup() {
     }
 
     Serial.println("LittleFS Mount Successful");
+    pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status neopixel to green
+    pixels.show(); // Set status pixel to green
+    delay(500);
 
     if(LittleFS.exists(mqttConfigFileName)) {
       Serial.println("MQTT Config file exists, loading");
@@ -620,48 +693,36 @@ void setup() {
       Serial.println("Entered config mode");
       Serial.println(WiFi.softAPIP());
       Serial.println(myWiFiManager->getConfigPortalSSID());
-      
-/*       display.clearDisplay();
-      display.setTextSize(2);
-      display.setTextColor(SSD1306_WHITE);
-      display.setCursor(4,4);
-      display.println(WiFi.softAPIP());
-      display.setTextSize(1);
-      display.setCursor(0, 20);
-      display.println("123456789012345");
-      display.setCursor(0, 28);
-      display.println("123456789012345");
-      display.setCursor(0, 36);
-      display.println("123456789012345678901234567890");
-      display.display(); */
+
+      pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to red
+      pixels.show(); // Set status pixel to red
+
       display.clearDisplay();
-
-      display.setTextSize(2); // Draw 2X-scale text
+      display.setTextSize(1); // Draw 2X-scale text
       display.setTextColor(SSD1306_WHITE);
-      display.setCursor(10, 0);
-      display.println(F("scroll"));
-      display.display();      // Show initial text
-      delay(100);
+      display.setCursor(5, 5);
+      display.println(F("Didnt Connect Wifi!"));
+      display.setCursor(5, 14);
+      display.println(F("Please connect to:"));
+      display.setCursor(5, 23);
+      display.print(F("< "));
+      display.print(myWiFiManager->getConfigPortalSSID());
+      display.println(F(" >"));
+      display.setCursor(5, 32);
+      display.println(F("to enter your WiFi"));
+      display.setCursor(5, 41);
+      display.println(("at the web page: "));
+      display.setCursor(5, 50);
+      display.print(F("http://"));
+      display.println(WiFi.softAPIP());
 
-      // Scroll in various directions, pausing in-between:
-      display.startscrollright(0x00, 0x0F);
-      delay(2000);
-      display.stopscroll();
-      delay(1000);
-      display.startscrollleft(0x00, 0x0F);
-      delay(2000);
-      display.stopscroll();
-      delay(1000);
-      display.startscrolldiagright(0x00, 0x07);
-      delay(2000);
-      display.startscrolldiagleft(0x00, 0x07);
-      delay(2000);
-      display.stopscroll();
-      delay(1000);
+      display.display();      // Show initial text
+      //display.startscrollleft(0x00, 0xFF);
+      delay(200);
 
     });
 
-    res = wm.autoConnect("Project Fish Works Base Station");
+    res = wm.autoConnect("Fish Sense Setup");
     if(!res) {
         Serial.println("Failed to connect");
         // ESP.restart();
@@ -676,6 +737,9 @@ void setup() {
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
+        pixels.setPixelColor(1, pixels.Color(150, 0, 0)); //Turn status pixel to green
+        pixels.show(); // Set status pixel to green
+        delay(500);
     }
 
     //read updated parameters
@@ -747,12 +811,28 @@ void setup() {
     digitalWrite(3, HIGH); //Turn on the LCD Backlight
     digitalWrite(19, HIGH); //Keep LCD on
 
-    //NeoPixel Setup Stuffs part 2
-    #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
-    clock_prescale_set(clock_div_1);
-    #endif
-    pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
-
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 10);
+    display.println(F("Boot Successful"));
+    display.setCursor(20, 30);
+    display.println(F("System Online"));
+    display.display(); // Show initial text
+    delay(3000);
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 10);
+    display.println(F("Entering Standby"));
+    display.setCursor(20, 30);
+    display.println(F("Good Night~~"));
+    display.display(); // Show initial text
+    delay(1000);
+    testdrawbitmap();
+    pixels.setPixelColor(0, pixels.Color(40, 0, 0)); //Dim pwr pixel
+    pixels.setPixelColor(1, pixels.Color(0, 0, 0)); //Turn off status pixel
+    pixels.show(); // Set all pixels
 
     //LCD Screen Setup Stuffs part 2  
 
@@ -776,7 +856,6 @@ void loop() {
     emailClientLoop(email_recipient, email_recipient_name);
 
     if (digitalRead(0) == LOW) {
-      backlightToggle();
       //latching debounce
       while(digitalRead(0) == LOW){
         delay(50);
@@ -784,36 +863,31 @@ void loop() {
       }
     if (digitalRead(21) == LOW) {
       Serial.println("Button 21 pressed");
-      //annoyingBuzz();
-      testLCDScreen();
+      annoyingBuzz();
+      testCurrentSense();
+      testdrawbitmap();
       //latching debounce
       while(digitalRead(21) == LOW){
         delay(50);
         }
       }
     if (digitalRead(47) == LOW) {
-    Serial.println("Button 47 pressed");
+      Serial.println("Button 47 pressed");
       //laching debounce
       while(digitalRead(47) == LOW){
-        pixels.clear(); // Set all pixel colors to 'off'
-
-          // The first NeoPixel in a strand is #0, second is 1, all the way up
-          // to the count of pixels minus one.
-          for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
-
-            // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
-            // Here we're using a moderately bright green color:
-            pixels.setPixelColor(i, pixels.Color(0, 150, 0));
-
-            pixels.show();   // Send the updated pixel colors to the hardware.
-
-            delay(DELAYVAL); // Pause before next pass through loop
-        delay(50);
-      }
+          pixels.setPixelColor(1, pixels.Color(0, 150, 0));
+          delay(DELAYVAL); // Pause before next pass through loop
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+          delay(DELAYVAL); // Pause before next pass through loop
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          pixels.setPixelColor(1, pixels.Color(0, 0, 150));
+          delay(DELAYVAL); // Pause before next pass through loop
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(500);
     }
-    pixels.setPixelColor(0, pixels.Color(0, 0, 0));
     pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    pixels.show(); // Set all pixel colors to 'off'
+    pixels.show(); // Set status pixel colour to 'off'
     }
 }
 
