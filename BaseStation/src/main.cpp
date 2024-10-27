@@ -66,39 +66,16 @@ bool shouldSaveConfig = false;
 
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
-// How many NeoPixels are attached to the Arduino?
 #define NUMPIXELS   2 // Popular NeoPixel ring size
-// When setting up the NeoPixel library, we tell it how many pixels,
-// and which pin to use to send signals. Note that for older NeoPixel
-// strips you might need to change the third parameter -- see the
-// strandtest example for more information on possible values.
-Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 #define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
 
 
 //LCD Screen Setup Stuffs
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
-
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-// The pins for I2C are defined by the Wire-library. 
-// On an arduino UNO:       A4(SDA), A5(SCL)
-// On an arduino MEGA 2560: 20(SDA), 21(SCL)
-// On an arduino LEONARDO:   2(SDA),  3(SCL), ...
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
-
-int LCD_SDA = 18;
-int LCD_SCL = 19;
-int CUR_SDA = 9;
-int CUR_SCL = 10;
-
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-Adafruit_INA219 ina219(0x4A);
-
 #define NUMFLAKES     3 // Number of snowflakes in the animation example
-
 #define LOGO_HEIGHT   16
 #define LOGO_WIDTH    16
 static const unsigned char PROGMEM logo_bmp[] =
@@ -119,6 +96,14 @@ static const unsigned char PROGMEM logo_bmp[] =
   0b01110000, 0b01110000,
   0b00000000, 0b00110000 };
 
+int LCD_SDA = 18;
+int LCD_SCL = 19;
+int CUR_SDA = 9;
+int CUR_SCL = 10;
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_INA219 ina219(0x4A);
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -661,11 +646,59 @@ void setup() {
     wm.addParameter(&custom_email_recipient);
     wm.addParameter(&custom_email_recipient_name);
 
-
+    
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
-    //wm.resetSettings();
-
+    
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 10);
+    display.println(F("Hold both buttons"));
+    display.setCursor(20, 30);
+    display.println(F("to rst wifi.."));
+    display.display(); // Show initial text
+    delay(2000);
+    if (digitalRead(21) == LOW && digitalRead(47) == LOW) {
+      display.clearDisplay();
+      display.setTextSize(1); // Draw 2X-scale text
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(10, 10);
+      display.println(F("Reseting Wifi.."));
+      display.setCursor(20, 30);
+      display.println(F("........"));
+      display.display(); // Show initial text
+      delay(500);
+      pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to red
+      pixels.show(); // Set status pixel to red
+      display.clearDisplay();
+      display.setTextSize(1); // Draw 2X-scale text
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(5, 5);
+      display.println(F("Didnt Connect Wifi!"));
+      display.setCursor(5, 14);
+      display.println(F("Please connect to:"));
+      display.setCursor(5, 23);
+      display.print(F("< "));
+      display.print("Fish Sense Setup");
+      display.println(F(" >"));
+      display.setCursor(5, 32);
+      display.println(F("to enter your WiFi"));
+      display.setCursor(5, 41);
+      display.println(("at the web page: "));
+      display.setCursor(5, 50);
+      display.println(F("http://10.10.1.1"));
+      display.display();     
+      //wm.resetSettings();
+      wm.startConfigPortal("Fish Sense Setup");
+    }
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 30);
+    display.println(F("Continuing Boot"));
+    display.display(); // Show initial text
+    delay(500);
     // Automatically connect using saved credentials,
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
     // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
@@ -850,30 +883,60 @@ void loop() {
     if (digitalRead(21) == LOW) {
       Serial.println("Button 21 pressed");
       annoyingBuzz();
-      testCurrentSense();
-      testdrawbitmap();
       //latching debounce
       while(digitalRead(21) == LOW){
+        testCurrentSense();
         delay(50);
         }
+      testdrawbitmap();
       }
     if (digitalRead(47) == LOW) {
       Serial.println("Button 47 pressed");
-      //laching debounce
-      while(digitalRead(47) == LOW){
-          pixels.setPixelColor(1, pixels.Color(0, 150, 0));
-          delay(DELAYVAL); // Pause before next pass through loop
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          pixels.setPixelColor(1, pixels.Color(150, 0, 0));
-          delay(DELAYVAL); // Pause before next pass through loop
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          pixels.setPixelColor(1, pixels.Color(0, 0, 150));
-          delay(DELAYVAL); // Pause before next pass through loop
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          delay(500);
-    }
+      Serial.println("Press button 21 to reset");
+      display.clearDisplay();
+      display.setTextSize(1); // Draw 2X-scale text
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(10, 10);
+      display.println(F("Press button 21"));
+      display.setCursor(20, 30);
+      display.println(F("to reset Fish Sense"));
+      display.display(); // Show initial text
+      delay(50);
+      annoyingBuzz();
+      while (digitalRead(47) == LOW) {
+        pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+        pixels.show();   // Send the updated pixel colors to the hardware.
+        delay(200); // Pause before next pass through loop
+        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+        pixels.show();   // Send the updated pixel colors to the hardware.
+        delay(200); // Pause before next pass through loop
+        if (digitalRead(21) == LOW) {
+          //wm.startConfigPortal("Fish Sense Setup");
+          //laching debounce
+          Serial.println("Both buttons pressed");
+          Serial.println("Resetting Fish Sense");
+          display.clearDisplay();
+          display.setTextSize(1); // Draw 2X-scale text
+          display.setTextColor(SSD1306_WHITE);
+          display.setCursor(10, 10);
+          display.println(F("Reseting Fish Sense"));
+          display.setCursor(10, 30);
+          display.println(F("Brb......"));
+          display.display(); // Show initial text
+          for (int i=0; i<3; i++) {
+            pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+            pixels.show();   // Send the updated pixel colors to the hardware.
+            delay(DELAYVAL); // Pause before next pass through loop
+            pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+            pixels.show();   // Send the updated pixel colors to the hardware.
+            delay(DELAYVAL); // Pause before next pass through loop
+          }
+          ESP.restart();
+        }
+      } 
     pixels.setPixelColor(1, pixels.Color(0, 0, 0));
     pixels.show(); // Set status pixel colour to 'off'
+    testdrawbitmap();
     }
 }
 
