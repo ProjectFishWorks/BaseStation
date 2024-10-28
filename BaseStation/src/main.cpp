@@ -484,22 +484,22 @@ void screenSaver(void) {
     random(1, (display.height() - LOGO_HEIGHT)),
     logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
-    for (int i = 0; i < 75; i++) {
+    for (int i = 0; i < 150; i++) {
       if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
         break;
         }
-      delay(100);
+      delay(16);
       //Serial.println(i);
-      pixels.setPixelColor(0, pixels.Color((150 - (i*2)), 0, 0));
+      pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
       pixels.show();
     }
-    for (int i = 0; i < 75; i++) {
+    for (int i = 0; i < 150; i++) {
       if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
         break;
         }
-      delay(100);
+      delay(16);
       //Serial.println(i);
-      pixels.setPixelColor(0, pixels.Color((0 + (i * 2)), 0, 0));
+      pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
       pixels.show();
     }
   }
@@ -577,7 +577,7 @@ void testCurrentSense () {
   display.clearDisplay();
   display.setTextSize(2); // Draw 2X-scale text
   display.setCursor(1, 10);
-  display.println(F("Current is:"));
+  display.println(F("Current is"));
   display.setTextSize(1); // Draw 1X-scale text
   display.setCursor(1, 30);
   display.print(current_mA);
