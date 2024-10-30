@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x00
+#define baseStationID 0x01
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -66,59 +66,101 @@ bool shouldSaveConfig = false;
 
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
-// How many NeoPixels are attached to the Arduino?
 #define NUMPIXELS   2 // Popular NeoPixel ring size
-// When setting up the NeoPixel library, we tell it how many pixels,
-// and which pin to use to send signals. Note that for older NeoPixel
-// strips you might need to change the third parameter -- see the
-// strandtest example for more information on possible values.
-Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 #define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
 
 
 //LCD Screen Setup Stuffs
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
-
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-// The pins for I2C are defined by the Wire-library. 
-// On an arduino UNO:       A4(SDA), A5(SCL)
-// On an arduino MEGA 2560: 20(SDA), 21(SCL)
-// On an arduino LEONARDO:   2(SDA),  3(SCL), ...
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+#define NUMFLAKES     3 // Number of snowflakes in the animation example
+#define LOGO_HEIGHT   48
+#define LOGO_WIDTH    64
+static const unsigned char PROGMEM logo_bmp[] =
+/**
+ * Made with Marlin Bitmap Converter
+ * https://marlinfw.org/tools/u8glib/converter.html
+ *
+ * This bitmap from the file 'image1 (2).bmp'
+ */
+{
+  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B11111111,B11111100,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000111,B00000011,B00000011,B10000000,B00000000,B00000000,
+  B00000000,B00000000,B00011000,B11110000,B01111100,B11100000,B00000000,B00000000,
+  B00000000,B00000000,B00100011,B00001111,B11000011,B00110000,B00000000,B00000000,
+  B00000000,B00000000,B01001100,B11100000,B00011100,B11011000,B00000000,B00000000,
+  B00000000,B00000000,B01110011,B00011111,B11100011,B00110000,B00000000,B00000000,
+  B00000000,B00000000,B00000100,B11000000,B00011100,B10000000,B00000000,B00000000,
+  B00000000,B00000000,B00001111,B00011100,B11100110,B10000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B01000111,B10011001,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B10011000,B01100100,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B11100111,B00011000,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B00001100,B10000000,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B00001100,B10000000,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B00000111,B10000000,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,
+  B00000001,B11111111,B11111111,B11111111,B11111111,B11111111,B11111111,B11110000,
+  B00000001,B10000000,B00000000,B00000000,B00000000,B00000000,B00001100,B00110000,
+  B00000001,B10111100,B00110000,B00000000,B00000111,B11110000,B00001000,B00110000,
+  B00000001,B10000000,B00000000,B01111111,B00000000,B00000011,B11111111,B11110000,
+  B00000001,B00011000,B00000000,B11010011,B11101111,B11000000,B00000000,B00010000,
+  B00000001,B00011000,B00000001,B10111101,B11111101,B00110000,B00000000,B00010000,
+  B00000001,B00000000,B00000111,B10000000,B11111001,B01001000,B00000000,B00010000,
+  B00000001,B00000000,B00011100,B00000000,B00011111,B11100100,B00001110,B00010000,
+  B00000001,B00000000,B11100100,B00000000,B00010001,B11111100,B00110111,B00010000,
+  B00000001,B00000001,B00110010,B00000000,B00010000,B00111100,B11111001,B10010000,
+  B00000001,B00000110,B10011011,B00000000,B00010000,B00011101,B11111001,B10010000,
+  B00000001,B00001101,B11101001,B00000000,B00000000,B00010100,B01111001,B10010000,
+  B00000001,B10011101,B11101001,B00000000,B00010000,B00010100,B01111111,B10010000,
+  B00000001,B10011110,B11001001,B00011111,B10010000,B00010100,B01111001,B10010000,
+  B00000001,B10011010,B00001001,B01111100,B11010000,B00011100,B11111101,B10010000,
+  B00000001,B10001110,B00001001,B01011100,B01010000,B00011111,B11100001,B10110000,
+  B00000000,B10000111,B00110010,B01111100,B01010000,B01111100,B11100001,B00110000,
+  B00000000,B10000000,B11100100,B00011111,B11010011,B11111100,B00111011,B00100000,
+  B00000000,B11000000,B00111100,B00000011,B11111111,B11100100,B00001110,B00100000,
+  B00000000,B01000000,B00000011,B11111111,B11111111,B10001000,B00000000,B01000000,
+  B00000000,B00100000,B00000001,B11110110,B00111110,B01110000,B00000000,B11000000,
+  B00000000,B00110000,B00000000,B11100010,B00000011,B10000000,B00000000,B10000000,
+  B00000000,B00011000,B00000000,B01110010,B00000000,B00000000,B00000001,B00000000,
+  B00000000,B00001100,B00000000,B00011110,B00000000,B00000000,B00000010,B00000000,
+  B00000000,B00000111,B11110000,B00000000,B00000111,B11110000,B01111100,B00000000,
+  B00000000,B00000011,B11111111,B00000000,B11111100,B00111100,B00111000,B00000000,
+  B00000000,B00000111,B11111111,B11111111,B11111111,B11111111,B11111100,B00000000,
+  B00000000,B00000110,B00000000,B00000000,B00000000,B00000000,B00000100,B00000000,
+  B00000000,B00011111,B11111111,B11111111,B11111111,B11111111,B11111111,B00000000,
+  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,
+  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000
+};
+
+// { 0b00000000, 0b11000000,
+//   0b00000001, 0b11000000,
+//   0b00000001, 0b11000000,
+//   0b00000011, 0b11100000,
+//   0b11110011, 0b11100000,
+//   0b11111110, 0b11111000,
+//   0b01111110, 0b11111111,
+//   0b00110011, 0b10011111,
+//   0b00011111, 0b11111100,
+//   0b00001101, 0b01110000,
+//   0b00011011, 0b10100000,
+//   0b00111111, 0b11100000,
+//   0b00111111, 0b11110000,
+//   0b01111100, 0b11110000,
+//   0b01110000, 0b01110000,
+//   0b00000000, 0b00110000 };
 
 int LCD_SDA = 18;
 int LCD_SCL = 19;
 int CUR_SDA = 9;
 int CUR_SCL = 10;
 
-
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Adafruit_INA219 ina219(0x4A);
-
-#define NUMFLAKES     3 // Number of snowflakes in the animation example
-
-#define LOGO_HEIGHT   16
-#define LOGO_WIDTH    16
-static const unsigned char PROGMEM logo_bmp[] =
-{ 0b00000000, 0b11000000,
-  0b00000001, 0b11000000,
-  0b00000001, 0b11000000,
-  0b00000011, 0b11100000,
-  0b11110011, 0b11100000,
-  0b11111110, 0b11111000,
-  0b01111110, 0b11111111,
-  0b00110011, 0b10011111,
-  0b00011111, 0b11111100,
-  0b00001101, 0b01110000,
-  0b00011011, 0b10100000,
-  0b00111111, 0b11100000,
-  0b00111111, 0b11110000,
-  0b01111100, 0b11110000,
-  0b01110000, 0b01110000,
-  0b00000000, 0b00110000 };
-
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -421,10 +463,51 @@ void testdrawbitmap(void) {
   display.clearDisplay();
 
   display.drawBitmap(
-    (display.width()  - LOGO_WIDTH ) / 2,
-    (display.height() - LOGO_HEIGHT) / 2,
+    //(display.width()  - LOGO_WIDTH ) / 2,
+    random(1 - (LOGO_WIDTH / 2), display.width()),
+    //(display.height() - LOGO_HEIGHT) / 2,
+    random(1 - (LOGO_HEIGHT / 2), display.height()),
     logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
   display.display();
+}
+
+//Test stuff for LCD Screen
+void screenSaver(void) {
+  Serial.println("Screen saver");
+  while (digitalRead(21) == HIGH && digitalRead(47) == HIGH) {
+    //Serial.println("Screen saver loop");
+    pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+    pixels.show();
+    display.clearDisplay();
+    display.drawBitmap(
+    //(display.width()  - LOGO_WIDTH ) / 2,
+    random(1, (display.width() - LOGO_WIDTH)),
+    //(display.height() - LOGO_HEIGHT) / 2,
+    random(1, (display.height() - LOGO_HEIGHT)),
+    logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+    display.display();
+    for (int i = 0; i < 150; i++) {
+      if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+        break;
+        }
+      delay(16);
+      //Serial.println(i);
+      pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+      pixels.show();
+    }
+    for (int i = 0; i < 150; i++) {
+      if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+        break;
+        }
+      delay(16);
+      //Serial.println(i);
+      pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
+      pixels.show();
+    }
+  }
+  Serial.println("Screen saver off");
+  pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+  pixels.show();
 }
 
 #define XPOS   0 // Indexes into the 'icons' array in function below
@@ -496,7 +579,7 @@ void testCurrentSense () {
   display.clearDisplay();
   display.setTextSize(2); // Draw 2X-scale text
   display.setCursor(1, 10);
-  display.println(F("Current is:"));
+  display.println(F("Current is"));
   display.setTextSize(1); // Draw 1X-scale text
   display.setCursor(1, 30);
   display.print(current_mA);
@@ -547,6 +630,7 @@ void setup() {
       (display.height() - LOGO_HEIGHT) / 2,
       logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
     display.display();
+    delay(1000);
     Serial.println(F("Initialized LCD Screen"));
 
 
@@ -555,13 +639,16 @@ void setup() {
     clock_prescale_set(clock_div_1);
     #endif
     pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
+    pixels.setBrightness(20); // Set BRIGHTNESS to about 1/23 (max = 255)
     pixels.clear(); // Set all pixel colors to 'off'
     for (int i=0; i<NUMPIXELS; i++){
       pixels.setPixelColor(i, pixels.Color(150, 150, 0));
-      //pixels.setPixelColor(1, pixels.Color(0, 150, 0));
     }
     pixels.show(); // Set all pixels to yellow
     Serial.println(F("Initialized NeoPixel"));
+
+
+
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
@@ -663,11 +750,70 @@ void setup() {
     wm.addParameter(&custom_email_recipient);
     wm.addParameter(&custom_email_recipient_name);
 
-
+    
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
-    //wm.resetSettings();
+    
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 10);
+    display.println(F("Hold both buttons"));
+    display.setCursor(20, 30);
+    display.println(F("to rst wifi.."));
+    display.display(); // Show initial text
+    for (int i=0; i<4; i++) {
+      pixels.setPixelColor(1, pixels.Color(0, 0, 150));
+      pixels.show();   // Send the updated pixel colors to the hardware.
+      delay(250); // Pause before next pass through loop
+      pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+      pixels.show();   // Send the updated pixel colors to the hardware.
+      delay(250); // Pause before next pass through loop
+    }
 
+    //delay(2000);
+    if (digitalRead(21) == LOW && digitalRead(47) == LOW) {
+      pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to blue
+      pixels.show(); // Set status pixel to red
+      display.clearDisplay();
+      display.setTextSize(1); // Draw 2X-scale text
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(10, 10);
+      display.println(F("Reseting Wifi.."));
+      display.setCursor(20, 30);
+      display.println(F("........"));
+      display.display(); // Show initial text
+      delay(500);
+      display.clearDisplay();
+      display.setTextSize(1); // Draw 2X-scale text
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(5, 5);
+      display.println(F("Didnt Connect Wifi!"));
+      display.setCursor(5, 14);
+      display.println(F("Please connect to:"));
+      display.setCursor(5, 23);
+      display.print(F("< "));
+      display.print("Fish Sense Setup");
+      display.println(F(" >"));
+      display.setCursor(5, 32);
+      display.println(F("to enter your WiFi"));
+      display.setCursor(5, 41);
+      display.println(("at the web page: "));
+      display.setCursor(5, 50);
+      display.println(F("http://10.10.1.1"));
+      display.display();     
+      //wm.resetSettings();
+      wm.startConfigPortal("Fish Sense Setup");
+    }
+    pixels.setPixelColor(1, pixels.Color(150, 150, 0)); //Turn status pixel to yellow
+    pixels.show(); // Set status pixel to green
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 30);
+    display.println(F("Continuing Boot"));
+    display.display(); // Show initial text
+    delay(500);
     // Automatically connect using saved credentials,
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
     // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
@@ -799,6 +945,8 @@ void setup() {
     digitalWrite(3, HIGH); //Turn on the LCD Backlight
     digitalWrite(19, HIGH); //Keep LCD on
 
+    pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status pixel to green
+    pixels.show(); // Set status pixel to green
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
@@ -817,11 +965,6 @@ void setup() {
     display.println(F("Good Night~~"));
     display.display(); // Show initial text
     delay(1000);
-    testdrawbitmap();
-    pixels.setPixelColor(0, pixels.Color(40, 0, 0)); //Dim pwr pixel
-    pixels.setPixelColor(1, pixels.Color(0, 0, 0)); //Turn off status pixel
-    pixels.show(); // Set all pixels
-
     //LCD Screen Setup Stuffs part 2  
 
     xTaskCreatePinnedToCore(
@@ -840,7 +983,7 @@ void loop() {
 
     //TODO: Move the MQTT connection to a separate task
 
-
+    //TODO: Move the email client to a separate task????????????????????
     emailClientLoop(email_recipient, email_recipient_name);
 
     if (digitalRead(0) == LOW) {
@@ -852,31 +995,58 @@ void loop() {
     if (digitalRead(21) == LOW) {
       Serial.println("Button 21 pressed");
       annoyingBuzz();
-      testCurrentSense();
-      testdrawbitmap();
       //latching debounce
       while(digitalRead(21) == LOW){
+        testCurrentSense();
         delay(50);
         }
       }
     if (digitalRead(47) == LOW) {
       Serial.println("Button 47 pressed");
-      //laching debounce
-      while(digitalRead(47) == LOW){
-          pixels.setPixelColor(1, pixels.Color(0, 150, 0));
-          delay(DELAYVAL); // Pause before next pass through loop
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          pixels.setPixelColor(1, pixels.Color(150, 0, 0));
-          delay(DELAYVAL); // Pause before next pass through loop
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          pixels.setPixelColor(1, pixels.Color(0, 0, 150));
-          delay(DELAYVAL); // Pause before next pass through loop
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          delay(500);
+      Serial.println("Press button 21 to reset");
+      display.clearDisplay();
+      display.setTextSize(1); // Draw 2X-scale text
+      display.setTextColor(SSD1306_WHITE);
+      display.setCursor(10, 10);
+      display.println(F("Press button 21"));
+      display.setCursor(20, 30);
+      display.println(F("to reset Fish Sense"));
+      display.display(); // Show initial text
+      delay(50);
+      annoyingBuzz();
+      while (digitalRead(47) == LOW) {
+        pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+        pixels.show();   // Send the updated pixel colors to the hardware.
+        delay(200); // Pause before next pass through loop
+        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+        pixels.show();   // Send the updated pixel colors to the hardware.
+        delay(200); // Pause before next pass through loop
+        if (digitalRead(21) == LOW) {
+          //wm.startConfigPortal("Fish Sense Setup");
+          //laching debounce
+          Serial.println("Both buttons pressed");
+          Serial.println("Resetting Fish Sense");
+          display.clearDisplay();
+          display.setTextSize(1); // Draw 2X-scale text
+          display.setTextColor(SSD1306_WHITE);
+          display.setCursor(10, 10);
+          display.println(F("Reseting Fish Sense"));
+          display.setCursor(10, 30);
+          display.println(F("Brb......"));
+          display.display(); // Show initial text
+          for (int i=0; i<3; i++) {
+            pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+            pixels.show();   // Send the updated pixel colors to the hardware.
+            delay(DELAYVAL); // Pause before next pass through loop
+            pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+            pixels.show();   // Send the updated pixel colors to the hardware.
+            delay(DELAYVAL); // Pause before next pass through loop
+          }
+          ESP.restart();
+        }
+      } 
     }
-    pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    pixels.show(); // Set status pixel colour to 'off'
-    }
+    screenSaver();
 }
 
 void mqttLoop(void* _this){
