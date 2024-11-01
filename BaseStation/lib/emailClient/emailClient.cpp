@@ -68,10 +68,11 @@ void sendEmail(AlertData *data, char *recipient, char *recipient_name){
       String deviceName = "Node " + String(data->nodeID);
 
       //Send manifest data to the MQTT broker
-      if(SD.exists(manifestFileName)) {
+      if(LittleFS.exists(manifestFileName)) {
         Serial.println("Manifest file exists");
-        File manifestFile = SD.open(manifestFileName, FILE_READ);
+        File manifestFile = LittleFS.open(manifestFileName, FILE_READ);
         String manifestString = manifestFile.readString();
+        manifestFile.close();
 
         JsonDocument manifestDoc;
 

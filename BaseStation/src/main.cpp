@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x01
+#define baseStationID 0x00
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -63,6 +63,10 @@ char email_recipient_name[255] = "Sebastien Robitaille";
 //flag for saving data
 bool shouldSaveConfig = false;
 
+//Screen Savers
+
+bool showScreenSaver = false;
+bool endingScreenSaver = false;
 
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
@@ -153,8 +157,8 @@ static const unsigned char PROGMEM logo_bmp[] =
 //   0b01110000, 0b01110000,
 //   0b00000000, 0b00110000 };
 
-int LCD_SDA = 18;
-int LCD_SCL = 19;
+int LCD_SDA = 13;
+int LCD_SCL = 14;
 int CUR_SDA = 9;
 int CUR_SCL = 10;
 
@@ -186,6 +190,8 @@ QueueHandle_t log_file_queue;
 
 //MQTT Loop Task
 void mqttLoop(void* _this); 
+
+void screenSaverTask(void *parameters);
 
 //Function that is called when a CAN Bus message is received
 void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
@@ -668,7 +674,7 @@ void setup() {
     display.display();      // Show initial text
     delay(2000);
 
-    if (!LittleFS.begin(0)) {
+    if (!LittleFS.begin(1)) {
       Serial.println("LittleFS Mount Failed");
       //TODO: stall startup here
       return;
@@ -975,7 +981,17 @@ void setup() {
         1,          /* Priority of the task */
         NULL,       /* Task handle. */
         0);         /* Core where the task should run */
-    
+
+    showScreenSaver = 1;
+
+    xTaskCreatePinnedToCore(
+        screenSaverTask,   /* Function to implement the task */
+        "screenSaverTask", /* Name of the task */
+        10000,      /* Stack size in words */
+        NULL,       /* Task input parameter */
+        1,          /* Priority of the task */
+        NULL,       /* Task handle. */
+        0);         /* Core where the task should run */
 
 }
 
@@ -1046,7 +1062,55 @@ void loop() {
         }
       } 
     }
-    screenSaver();
+    //screenSaver();
+}
+
+void screenSaverTask(void *parameters){
+
+  Serial.println("Screen saver started");
+  
+  while(1){
+    if (showScreenSaver) {
+    //Serial.println("Screen saver loop");
+    pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+    pixels.show();
+    display.clearDisplay();
+    display.drawBitmap(
+    //(display.width()  - LOGO_WIDTH ) / 2,
+    random(1, (display.width() - LOGO_WIDTH)),
+    //(display.height() - LOGO_HEIGHT) / 2,
+    random(1, (display.height() - LOGO_HEIGHT)),
+    logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+    display.display();
+    for (int i = 0; i < 150; i++) {
+      if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+        break;
+        }
+      delay(16);
+      //Serial.println(i);
+      pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+      pixels.show();
+    }
+    for (int i = 0; i < 150; i++) {
+      if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+        break;
+        }
+      delay(16);
+      //Serial.println(i);
+      pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
+      pixels.show();
+      endingScreenSaver = 1;
+    }
+  }
+  if (endingScreenSaver == 1 && showScreenSaver == 0){
+    Serial.println("Screen saver off");
+    pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+    pixels.show();
+    endingScreenSaver = 0;
+  }
+  delay(100);
+
+}
 }
 
 void mqttLoop(void* _this){
@@ -1060,4 +1124,5 @@ void mqttLoop(void* _this){
     mqttClient.loop();
     delay(10);
   }
-} 
+  }
+  
