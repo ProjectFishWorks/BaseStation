@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x00
+#define baseStationID 0x01
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -598,6 +598,18 @@ void testCurrentSense () {
 }
 //Yeah, There is lots of it.
 
+//Create Screen Saver Task
+void createScreenSaverTask () {
+  xTaskCreatePinnedToCore(
+    screenSaverTask, /* Function to implement the task */
+    "ScreenSaverTask", /* Name of the task */
+    10000,  /* Stack size in words */
+    NULL,  /* Task input parameter */
+    1,  /* Priority of the task */
+    NULL,  /* Task handle. */
+    0); /* Core where the task should run */
+}
+
 void setup() {
     //Start the serial connection
     Serial.begin(115200);
@@ -983,7 +995,6 @@ void setup() {
         0);         /* Core where the task should run */
 
     showScreenSaver = 1;
-
     xTaskCreatePinnedToCore(
         screenSaverTask,   /* Function to implement the task */
         "screenSaverTask", /* Name of the task */
@@ -1015,6 +1026,8 @@ void loop() {
       while(digitalRead(21) == LOW){
         testCurrentSense();
         delay(50);
+        showScreenSaver = 1;
+        createScreenSaverTask();
         }
       }
     if (digitalRead(47) == LOW) {
@@ -1061,45 +1074,50 @@ void loop() {
           ESP.restart();
         }
       } 
+      showScreenSaver = 1;
+      createScreenSaverTask();
     }
     //screenSaver();
 }
 
 void screenSaverTask(void *parameters){
 
-  Serial.println("Screen saver started");
+  Serial.println("Screen saver task started");
   
   while(1){
     if (showScreenSaver) {
-    //Serial.println("Screen saver loop");
-    pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    pixels.show();
-    display.clearDisplay();
-    display.drawBitmap(
-    //(display.width()  - LOGO_WIDTH ) / 2,
-    random(1, (display.width() - LOGO_WIDTH)),
-    //(display.height() - LOGO_HEIGHT) / 2,
-    random(1, (display.height() - LOGO_HEIGHT)),
-    logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-    display.display();
-    for (int i = 0; i < 150; i++) {
-      if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
-        break;
-        }
-      delay(16);
-      //Serial.println(i);
-      pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+      delay(50);
+      endingScreenSaver = 1;
+      Serial.println("Running Screen Saver");
+      pixels.setPixelColor(1, pixels.Color(0, 0, 0));
       pixels.show();
-    }
-    for (int i = 0; i < 150; i++) {
-      if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
-        break;
-        }
+      display.clearDisplay();
+      display.drawBitmap(
+      //(display.width()  - LOGO_WIDTH ) / 2,
+      random(1, (display.width() - LOGO_WIDTH)),
+      //(display.height() - LOGO_HEIGHT) / 2,
+      random(1, (display.height() - LOGO_HEIGHT)),
+      logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+      display.display();
+      for (int i = 0; i < 150; i++) {
+        if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+          //break;
+          showScreenSaver = 0;
+          vTaskDelete(NULL);
+          }
+        delay(16);
+        pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+        pixels.show();
+      }
+      for (int i = 0; i < 150; i++) {
+        if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+          //break;
+          showScreenSaver = 0;
+          vTaskDelete(NULL);
+          }
       delay(16);
-      //Serial.println(i);
       pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
       pixels.show();
-      endingScreenSaver = 1;
     }
   }
   if (endingScreenSaver == 1 && showScreenSaver == 0){
