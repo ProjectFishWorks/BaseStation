@@ -65,7 +65,7 @@ bool shouldSaveConfig = false;
 
 //Screen Savers
 
-bool showScreenSaver = false;
+bool screenSaverRunning;
 
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
@@ -181,6 +181,13 @@ typedef struct {
   uint8_t isCleared = 1;
 } UIAlertData;
 
+//Current Sense Variables
+float shuntvoltage = 0;
+float busvoltage = 0;
+float current_mA = 0;
+float loadvoltage = 0;
+float power_mW = 0;
+
 //Array of AlertData
 UIAlertData alertQueue[50];
 
@@ -205,12 +212,9 @@ QueueHandle_t log_file_queue;
 //MQTT Loop Task
 void mqttLoop(void* _this); 
 
-void screenSaverTask(void *parameters);
-TaskHandle_t xHandle = NULL;
-
 void neoPixelTask(void *parameters);
 
-void mainUITask(void *parameters);
+void mainUIDisplayTask(void *parameters);
 
 void sendWarningToQueue();
 
@@ -254,16 +258,14 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
         for(int i = 0; i < 50; i++){
           if(alertQueue[i].isCleared == 1){
             alertQueue[i].nodeID = nodeID;
-            alertQueue[i].isWarning = messageID == WARN_ID ? 1 : 0;
+            alertQueue[i].isWarning = 0;
             alertQueue[i].isSilenced = 0;
             alertQueue[i].isCleared = 0;
+            baseStationState = 3;
+            delay(10);
             break;
           }
         }
-        baseStationState = 1;
-        showScreenSaver = 0;
-        vTaskDelete( xHandle );
-        delay(10);
 
         //xQueueSend(emailQueue, &alertData, portMAX_DELAY);
       }
@@ -501,110 +503,8 @@ void annoyingBuzz() {
   //}
 }
 
-//Test stuff for LCD Screen
-void testdrawbitmap(void) {
-  display.clearDisplay();
-
-  display.drawBitmap(
-    //(display.width()  - LOGO_WIDTH ) / 2,
-    random(1 - (LOGO_WIDTH / 2), display.width()),
-    //(display.height() - LOGO_HEIGHT) / 2,
-    random(1 - (LOGO_HEIGHT / 2), display.height()),
-    logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-  display.display();
-}
-
-//Test stuff for LCD Screen
-void screenSaver(void) {
-  Serial.println("Screen saver");
-  while (digitalRead(21) == HIGH && digitalRead(47) == HIGH) {
-    //Serial.println("Screen saver loop");
-    pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    pixels.show();
-    display.clearDisplay();
-    display.drawBitmap(
-    //(display.width()  - LOGO_WIDTH ) / 2,
-    random(1, (display.width() - LOGO_WIDTH)),
-    //(display.height() - LOGO_HEIGHT) / 2,
-    random(1, (display.height() - LOGO_HEIGHT)),
-    logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-    display.display();
-    for (int i = 0; i < 150; i++) {
-      if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
-        break;
-        }
-      delay(16);
-      //Serial.println(i);
-      pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
-      pixels.show();
-    }
-    for (int i = 0; i < 150; i++) {
-      if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
-        break;
-        }
-      delay(16);
-      //Serial.println(i);
-      pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
-      pixels.show();
-    }
-  }
-  Serial.println("Screen saver off");
-  pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-  pixels.show();
-}
-
-#define XPOS   0 // Indexes into the 'icons' array in function below
-#define YPOS   1
-#define DELTAY 2
-
-void testanimate(const uint8_t *bitmap, uint8_t w, uint8_t h) {
-  int8_t f, icons[NUMFLAKES][3];
-
-  // Initialize 'snowflake' positions
-  for(f=0; f< NUMFLAKES; f++) {
-    icons[f][XPOS]   = random(1 - LOGO_WIDTH, display.width());
-    icons[f][YPOS]   = -LOGO_HEIGHT;
-    icons[f][DELTAY] = random(1, 6);
-    Serial.print(F("x: "));
-    Serial.print(icons[f][XPOS], DEC);
-    Serial.print(F(" y: "));
-    Serial.print(icons[f][YPOS], DEC);
-    Serial.print(F(" dy: "));
-    Serial.println(icons[f][DELTAY], DEC);
-  }
-
-  for(int i=0; i<50; i++) { // Loop forever...
-    display.clearDisplay(); // Clear the display buffer
-
-    // Draw each snowflake:
-    for(f=0; f< NUMFLAKES; f++) {
-      display.drawBitmap(icons[f][XPOS], icons[f][YPOS], bitmap, w, h, SSD1306_WHITE);
-    }
-
-    display.display(); // Show the display buffer on the screen
-    delay(200);        // Pause for 1/10 second
-
-    // Then update coordinates of each flake...
-    for(f=0; f< NUMFLAKES; f++) {
-      icons[f][YPOS] += icons[f][DELTAY];
-      // If snowflake is off the bottom of the screen...
-      if (icons[f][YPOS] >= display.height()) {
-        // Reinitialize to a random position, just off the top
-        icons[f][XPOS]   = random(1 - LOGO_WIDTH, display.width());
-        icons[f][YPOS]   = -LOGO_HEIGHT;
-        icons[f][DELTAY] = random(1, 6);
-      }
-    }
-  }
-}
-
 void testCurrentSense () {
-  Serial.println("Test current sense");
-  float shuntvoltage = 0;
-  float busvoltage = 0;
-  float current_mA = 0;
-  float loadvoltage = 0;
-  float power_mW = 0;
+  Serial.println("Testing current");
 
   shuntvoltage = ina219.getShuntVoltage_mV();
   busvoltage = ina219.getBusVoltage_V();
@@ -612,45 +512,26 @@ void testCurrentSense () {
   power_mW = ina219.getPower_mW();
   loadvoltage = busvoltage + (shuntvoltage / 1000);
   
-  Serial.print("Bus Voltage:   "); Serial.print(busvoltage); Serial.println(" V");
-  Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage); Serial.println(" mV");
-  Serial.print("Load Voltage:  "); Serial.print(loadvoltage); Serial.println(" V");
-  Serial.print("Current:       "); Serial.print(current_mA); Serial.println(" mA");
-  Serial.print("Power:         "); Serial.print(power_mW); Serial.println(" mW");
-  Serial.println("");
+  // Serial.print("Bus Voltage:   "); Serial.print(busvoltage); Serial.println(" V");
+  // Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage); Serial.println(" mV");
+  // Serial.print("Load Voltage:  "); Serial.print(loadvoltage); Serial.println(" V");
+  // Serial.print("Current:       "); Serial.print(current_mA); Serial.println(" mA");
+  // Serial.print("Power:         "); Serial.print(power_mW); Serial.println(" mW");
+  // Serial.println("");
 
-  display.clearDisplay();
-  display.setTextSize(2); // Draw 2X-scale text
-  display.setCursor(1, 10);
-  display.println(F("Current is"));
-  display.setTextSize(1); // Draw 1X-scale text
-  display.setCursor(1, 30);
-  display.print(current_mA);
-  display.print(" mA");
-  display.display();      // Show initial text
+  // display.clearDisplay();
+  // display.setTextSize(2); // Draw 2X-scale text
+  // display.setCursor(1, 10);
+  // display.println(F("Current is"));
+  // display.setTextSize(1); // Draw 1X-scale text
+  // display.setCursor(1, 30);
+  // display.print(current_mA);
+  // display.print(" mA");
+  // display.display();      // Show initial text
 
   //testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT);    // Draw a small bitmap image
   Serial.println("Success");
 }
-//Yeah, There is lots of it.
-
-//Create Screen Saver Task
-void createScreenSaverTask () {
-  xTaskCreatePinnedToCore(
-    screenSaverTask, /* Function to implement the task */
-    "ScreenSaverTask", /* Name of the task */
-    10000,  /* Stack size in words */
-    NULL,  /* Task input parameter */
-    1,  /* Priority of the task */
-    &xHandle,  /* Task handle. */
-    0); /* Core where the task should run */
-}
-
-void sendWarningToQueue(UIAlertData *alertData) {
-  //add warning info to the UIAlertData array
-
-}
-
 
 void setup() {
     //Start the serial connection
@@ -1036,22 +917,22 @@ void setup() {
         NULL,       /* Task handle. */
         0);         /* Core where the task should run */
 
-    showScreenSaver = 1;
+
     baseStationState = 0;
 
-    xTaskCreatePinnedToCore(
-        screenSaverTask,   /* Function to implement the task */
-        "screenSaverTask", /* Name of the task */
-        10000,      /* Stack size in words */
-        NULL,       /* Task input parameter */
-        1,          /* Priority of the task */
-        &xHandle,       /* Task handle. */
-        0);         /* Core where the task should run */
+    // xTaskCreatePinnedToCore(
+    //     screenSaverTask,   /* Function to implement the task */
+    //     "screenSaverTask", /* Name of the task */
+    //     10000,      /* Stack size in words */
+    //     NULL,       /* Task input parameter */
+    //     1,          /* Priority of the task */
+    //     &xHandle,       /* Task handle. */
+    //     0);         /* Core where the task should run */
 
     //start the main UI task
     xTaskCreatePinnedToCore(
-        mainUITask,   /* Function to implement the task */
-        "mainUITask", /* Name of the task */
+        mainUIDisplayTask,   /* Function to implement the task */
+        "mainUIDisplayTask", /* Name of the task */
         10000,      /* Stack size in words */
         NULL,       /* Task input parameter */
         1,          /* Priority of the task */
@@ -1072,161 +953,157 @@ void setup() {
 }
 
 void loop() {
+    delay(10);
 
-    //TODO: Move the MQTT connection to a separate task
-
-    //TODO: Move the email client to a separate task????????????????????
     emailClientLoop(email_recipient, email_recipient_name);
-
-    // if (digitalRead(0) == LOW) {
-    //   //latching debounce
-    //   while(digitalRead(0) == LOW){
-    //     delay(50);
-    //     }
-    //   }
-    // if (digitalRead(21) == LOW) {
-    //   Serial.println("Button 21 pressed");
-    //   annoyingBuzz();
-    //   //latching debounce
-    //   while(digitalRead(21) == LOW){
-    //     testCurrentSense();
-    //     delay(50);
-    //     showScreenSaver = 1;
-    //     createScreenSaverTask();
-    //     }
-    //   }
-    // if (digitalRead(47) == LOW) {
-    //   Serial.println("Button 47 pressed");
-    //   Serial.println("Press button 21 to reset");
-    //   display.clearDisplay();
-    //   display.setTextSize(1); // Draw 2X-scale text
-    //   display.setTextColor(SSD1306_WHITE);
-    //   display.setCursor(10, 10);
-    //   display.println(F("Press button 21"));
-    //   display.setCursor(20, 30);
-    //   display.println(F("to reset Fish Sense"));
-    //   display.display(); // Show initial text
-    //   delay(50);
-    //   annoyingBuzz();
-    //   while (digitalRead(47) == LOW) {
-    //     pixels.setPixelColor(1, pixels.Color(150, 150, 0));
-    //     pixels.show();   // Send the updated pixel colors to the hardware.
-    //     delay(200); // Pause before next pass through loop
-    //     pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    //     pixels.show();   // Send the updated pixel colors to the hardware.
-    //     delay(200); // Pause before next pass through loop
-    //     if (digitalRead(21) == LOW) {
-    //       //wm.startConfigPortal("Fish Sense Setup");
-    //       //laching debounce
-    //       Serial.println("Both buttons pressed");
-    //       Serial.println("Resetting Fish Sense");
-    //       display.clearDisplay();
-    //       display.setTextSize(1); // Draw 2X-scale text
-    //       display.setTextColor(SSD1306_WHITE);
-    //       display.setCursor(10, 10);
-    //       display.println(F("Reseting Fish Sense"));
-    //       display.setCursor(10, 30);
-    //       display.println(F("Brb......"));
-    //       display.display(); // Show initial text
-    //       for (int i=0; i<3; i++) {
-    //         pixels.setPixelColor(1, pixels.Color(150, 0, 0));
-    //         pixels.show();   // Send the updated pixel colors to the hardware.
-    //         delay(DELAYVAL); // Pause before next pass through loop
-    //         pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    //         pixels.show();   // Send the updated pixel colors to the hardware.
-    //         delay(DELAYVAL); // Pause before next pass through loop
-    //       }
-    //       ESP.restart();
-    //     }
-    //   } 
-    //   showScreenSaver = 1;
-    //   createScreenSaverTask();
-    // }
-    //screenSaver();
+    if (digitalRead(21) == LOW) {
+      screenSaverRunning = false;
+      while (digitalRead(21) == LOW) {
+        delay(10);
+      }
+    }
+    if (digitalRead(47) == LOW) {
+      Serial.println("Button 47 pressed");
+      screenSaverRunning = false;
+      if (baseStationState == 3) {
+        delay(10);
+        } else {
+        if (baseStationState > 1) {
+          baseStationState = 0;
+          } else {
+          baseStationState ++;
+          }
+        }
+        Serial.println(baseStationState);
+        //latching debounce
+        while(digitalRead(47) == LOW){
+          delay(25);
+          }
+      }
+      for (int i = 0; i < 50; i++) {
+          if (alertQueue[i].isSilenced == 0) {
+            baseStationState = 3;
+          }
+      }
+    
 }
 
-//Main UI Task
-void mainUITask(void *parameters) {
+//Main UI Switch State Task
+void mainUIDisplayTask(void *parameters) {
+  long lastScreenSaver;
+  long lastCurrentTest;
+  int errorNumber;
   while (1) {
-    Serial.println("Main UI Task Loop, Top");
-    Serial.println(baseStationState);
-    delay(50);
-    //if there is an error in the UIAlertData, display the error message
-    for (int i = 0; i < 50; i++) {
-      if (alertQueue[i].isSilenced == 0) {
-        Serial.println("Interupt Error Page");
-        baseStationState = 1;
-        showScreenSaver = 0;
-        display.clearDisplay();
-        display.setTextSize(2); // Draw 2X-scale text
-        display.setTextColor(SSD1306_WHITE);
-        display.setCursor(10, 10);
-        display.println(F("Error:"));
-        display.setTextSize(1); // Draw 1X-scale text
-        display.setCursor(20, 30);
-        display.println(alertQueue[i].nodeID);
-        display.display(); // Show initial text
-        delay(1500);
-        while (alertQueue[i].isSilenced == 0) {       
-          annoyingBuzz();
-          delay(50);
-          if (digitalRead(21) == LOW) {
-            //latching debounce
-            while(digitalRead(21) == LOW){
-              alertQueue[i].isSilenced = 1;
-              delay(50);
-              }
-            }
-          }
-        } else {
-          if (showScreenSaver == 0 && baseStationState == 0) {
-            showScreenSaver = 1;
-            createScreenSaverTask();
-            delay(10);
-          }
-          delay(5);
-        }
-      }  
-    if (digitalRead(47) == LOW) {
-        if (baseStationState < 2) {
-          baseStationState ++;
-          Serial.println(baseStationState);
-        } else {
-          baseStationState = 0;
-          Serial.println(baseStationState);
-        }
-      //latching debounce
-      while(digitalRead(47) == LOW){
-        delay(10);
-        }
-      }
-    Serial.println("Main UI Task Loop, pre state 1");
-    if (baseStationState == 1) {
-      Serial.println("Error Page");
-      for (int i = 0; i < 50; i++) {
-        if (alertQueue[i].isCleared == 0) {
-          baseStationState = 1;
-          showScreenSaver = 0;
+    //switch case for the main UI display
+    switch (baseStationState) {
+
+      case 0:
+        //Screen Saver
+        if (screenSaverRunning == false) {
+          Serial.println("Starting Screen Saver");
+          screenSaverRunning = true;
           display.clearDisplay();
-          display.setTextSize(2); // Draw 2X-scale text
-          display.setTextColor(SSD1306_WHITE);
-          display.setCursor(10, 10);
-          display.println(F("Error:"));
-          display.setTextSize(1); // Draw 1X-scale text
-          display.setCursor(20, 30);
-          display.println(alertQueue[i].nodeID);
-          display.display(); // Show initial text
-          while (alertQueue[i].isCleared == 0) {     
-            delay(50);
-            if (digitalRead(21) == LOW) {
-              //latching debounce
-              while(digitalRead(21) == LOW){
+          display.drawBitmap(
+          random(1, (display.width() - LOGO_WIDTH)),
+          random(1, (display.height() - LOGO_HEIGHT)),
+          logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+          display.display();
+          lastScreenSaver = millis();
+          }
+        if (millis() > lastScreenSaver + 15000) {
+          Serial.println("Running Screen Saver");
+          display.clearDisplay();
+          display.drawBitmap(
+          random(1, (display.width() - LOGO_WIDTH)),
+          random(1, (display.height() - LOGO_HEIGHT)),
+          logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+          display.display();
+          lastScreenSaver = millis();
+          }
+        delay(25);
+        break;
+
+      case 1:
+        //Error Page
+        for (int i = 0; i < 50; i++) {
+          if (alertQueue[i].isCleared == 0) {
+            display.clearDisplay();
+            display.setTextSize(2); // Draw 2X-scale text
+            display.setTextColor(SSD1306_WHITE);
+            display.setCursor(10, 10);
+            display.print(F("Error "));
+            display.println(i + 1);
+            display.setTextSize(1); // Draw 1X-scale text
+            display.setCursor(20, 30);
+
+            String deviceName = "Node " + String(alertQueue[i].nodeID);
+
+            //Send manifest data to the MQTT broker
+            if(LittleFS.exists(manifestFileName)) {
+              Serial.println("Manifest file exists");
+              File manifestFile = LittleFS.open(manifestFileName, FILE_READ);
+              String manifestString = manifestFile.readString();
+              manifestFile.close();
+
+              JsonDocument manifestDoc;
+
+              // Parse the JSON object
+              DeserializationError error = deserializeJson(manifestDoc, manifestString);
+
+              if(error){
+                Serial.println("Error parsing manifest file");
+              }
+              else{
+                  //Get the devices array from the manifest file
+                  JsonArray devices = manifestDoc["Devices"].as<JsonArray>();
+                  uint16_t index = 0;
+                  while(!devices[index].isNull()){
+                    Serial.println("Checking device: " + devices[index]["NodeID"].as<String>());
+                    JsonObject device = devices[index];
+                    if(device["NodeID"] == alertQueue[i].nodeID){
+                      Serial.println("Device found in manifest file");
+                      deviceName = device["DeviceName"].as<String>();
+                      break;
+                    }
+                    index++;
+                  }
+              }
+            }else{
+              Serial.println("Manifest file does not exist");
+            }
+
+            display.println(deviceName);
+            display.display(); // Show initial text
+            delay(5);
+            while (alertQueue[i].isCleared == 0) {     
+              delay(25);
+              for (int e = 0; e < 50; e++) {
+                if (alertQueue[e].isSilenced == 0) {
+                  Serial.println("Move to Interupt Error Page");
+                  baseStationState = 3;
+                  break;
+                }
+              }
+              if (baseStationState == 3) {
+                break;
+              }
+              if (digitalRead(21) == LOW) {
                 alertQueue[i].isCleared = 1;
-                delay(5);
+                //latching debounce
+                while(digitalRead(21) == LOW){
+                  delay(25);
+                  }
+                  break;
+                }
+                if (digitalRead(47) == LOW) {
+                  while(digitalRead(47) == LOW) {
+                    delay(10);
+                    }
+                    break;
+                  }
               }
             }
           }
-        } else {
           display.clearDisplay();
           display.setTextSize(1); // Draw 2X-scale text
           display.setTextColor(SSD1306_WHITE);
@@ -1235,107 +1112,108 @@ void mainUITask(void *parameters) {
           display.setCursor(10, 30);
           display.println(F("Happy Fishes"));
           display.display(); // Show initial text
-          delay(10);
-          }
-        if (digitalRead(47) == LOW) {
-          baseStationState ++;
-          Serial.println(baseStationState);
-          //latching debounce
-          while(digitalRead(47) == LOW){
-            delay(10);
-            }
-          }
-        delay(10);
-      }
-    }
-    Serial.println("Main UI Task Loop, pre state 2");
-    if (baseStationState == 2) {
-      Serial.println("Current Sense Page");
-      testCurrentSense();
-      for (int i=0; i > 40; i++) {
-        if (digitalRead(47) == LOW) {
-          baseStationState = 0;
-          Serial.println(baseStationState);
-          //latching debounce
-          while(digitalRead(47) == LOW){
-            delay(10);
-            }
-          }
+          break;
+
+      case 2:
+        //Current Sense Pagelong lastScreenSaver = millis();
+        if (millis() > lastCurrentTest + 500) {
+        testCurrentSense();
+        long lastCurrentTest = millis();
+        }
+        display.clearDisplay();
+        display.setTextSize(2); // Draw 2X-scale text
+        display.setCursor(1, 10);
+        display.println(F("Current is"));
+        display.setTextSize(1); // Draw 1X-scale text
+        display.setCursor(1, 30);
+        display.print(current_mA);
+        display.print(" mA");
+        display.display();      // Show initial text
         delay(25);
-      }
-    }
-    Serial.println("Main UI Task Loop, pre state 0");
-    if (baseStationState == 0) {
-      if (showScreenSaver == 0) {
-        Serial.println("Screen Saver Starting");
-        showScreenSaver = 1;
-        createScreenSaverTask();
-        delay(10);
-    }
-  delay(10);
+        break;
+
+      case 3:  
+        //Error Warning Screen    
+        for (int i = 0; i < 50; i++) {
+          if (alertQueue[i].isSilenced == 0) {
+            Serial.println("Interupt Error Page");
+            display.clearDisplay();
+            display.setTextSize(2); // Draw 2X-scale text
+            display.setTextColor(SSD1306_WHITE);
+            display.setCursor(10, 10);
+            display.println(F("!!Error:"));
+            display.setTextSize(1); // Draw 1X-scale text
+            display.setCursor(20, 30);
+            
+            String deviceName = "Node " + String(alertQueue[i].nodeID);
+
+            //Send manifest data to the MQTT broker
+            if(LittleFS.exists(manifestFileName)) {
+              Serial.println("Manifest file exists");
+              File manifestFile = LittleFS.open(manifestFileName, FILE_READ);
+              String manifestString = manifestFile.readString();
+              manifestFile.close();
+
+              JsonDocument manifestDoc;
+
+              // Parse the JSON object
+              DeserializationError error = deserializeJson(manifestDoc, manifestString);
+
+              if(error){
+                Serial.println("Error parsing manifest file");
+              }
+              else{
+                  //Get the devices array from the manifest file
+                  JsonArray devices = manifestDoc["Devices"].as<JsonArray>();
+                  uint16_t index = 0;
+                  while(!devices[index].isNull()){
+                    Serial.println("Checking device: " + devices[index]["NodeID"].as<String>());
+                    JsonObject device = devices[index];
+                    if(device["NodeID"] == alertQueue[i].nodeID){
+                      Serial.println("Device found in manifest file");
+                      deviceName = device["DeviceName"].as<String>();
+                      break;
+                    }
+                    index++;
+                  }
+              }
+            }else{
+              Serial.println("Manifest file does not exist");
+            }
+
+            display.println(deviceName);
+            // display.println(alertQueue[i].nodeID);
+            display.display(); // Show initial text
+            delay(10);
+            while (alertQueue[i].isSilenced == 0) {       
+              annoyingBuzz();
+              delay(50);
+              if (digitalRead(21) == LOW) {
+                  alertQueue[i].isSilenced = 1;
+                  delay(25);
+                //latching debounce
+                while(digitalRead(21) == LOW){
+                  delay(10);
+                  }
+                  break;
+                }
+              }
+            }
+          }
+          Serial.println("Exiting Interupt Screen");
+          baseStationState = 1;
+          break;
+
+      default:
+        delay(25);
+        break;
   }
 }
 }
-    // if (digitalRead(21) == LOW) {
-    //   Serial.println("Button 21 pressed");
-    //   annoyingBuzz();
-    //   //latching debounce
-    //   while(digitalRead(21) == LOW){
-    //     testCurrentSense();
-    //     delay(50);
-    //     showScreenSaver = 1;
-    //     createScreenSaverTask();
-    //     }
-    //   }
-    // if (digitalRead(47) == LOW) {
-    //   Serial.println("Button 47 pressed");
-    //   Serial.println("Press button 21 to reset");
-    //   display.clearDisplay();
-    //   display.setTextSize(1); // Draw 2X-scale text
-    //   display.setTextColor(SSD1306_WHITE);
-    //   display.setCursor(10, 10);
-    //   display.println(F("Press button 21"));
-    //   display.setCursor(20, 30);
-    //   display.println(F("to reset Fish Sense"));
-    //   display.display(); // Show initial text
-    //   delay(50);
-    //   annoyingBuzz();
-    //   while (digitalRead(47) == LOW) {
-    //     pixels.setPixelColor(1, pixels.Color(150, 150, 0));
-    //     pixels.show();   // Send the updated pixel colors to the hardware.
-    //     delay(200); // Pause before next pass through loop
-    //     pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    //     pixels.show();   // Send the updated pixel colors to the hardware.
-    //     delay(200); // Pause before next pass through loop
-    //     if (digitalRead(21) == LOW) {
-    //       //wm.startConfigPortal("Fish Sense Setup");
-    //       //laching debounce
-    //       Serial.println("Both buttons pressed");
-    //       Serial.println("Resetting Fish Sense");
-    //       display.clearDisplay();
-    //       display.setTextSize(1); // Draw 2X-scale text
-    //       display.setTextColor(SSD1306_WHITE);
-    //       display.setCursor(10, 10);
-    //       display.println(F("Reseting Fish Sense"));
-    //       display.setCursor(10, 30);
-    //       display.println(F("Brb......"));
-    //       display.display(); // Show initial text
-    //       for (int i=0; i<3; i++) {
-    //         pixels.setPixelColor(1, pixels.Color(150, 0, 0));
-    //         pixels.show();   // Send the updated pixel colors to the hardware.
-    //         delay(DELAYVAL); // Pause before next pass through loop
-    //         pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-    //         pixels.show();   // Send the updated pixel colors to the hardware.
-    //         delay(DELAYVAL); // Pause before next pass through loop
-    //       }
-    //       ESP.restart();
-    //     }
-    //   } 
-    //   showScreenSaver = 1;
-    //   createScreenSaverTask();
-    // }
 
 void neoPixelTask(void *parameters) {
+  long lightingLoop;
+  bool lightingLoopState;
   while (1) {
     //if there is an error in the UIAlertData, display the error message
     //switch case to control the neopixel's
@@ -1360,16 +1238,61 @@ void neoPixelTask(void *parameters) {
         pixels.show();
       }
       break;
+
     case 1:
-      //Warning Lighting
+      //Error Lighting
       pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-      pixels.setPixelColor(1, pixels.Color(150, 150, 0));
-      pixels.show();   // Send the updated pixel colors to the hardware.
-      delay(750); // Pause before next pass through loop
-      pixels.setPixelColor(0, pixels.Color(150, 150, 0));
-      pixels.setPixelColor(1, pixels.Color(150, 0, 0));
-      pixels.show();   // Send the updated pixel colors to the hardware.
-      delay(750); // Pause before next pass through loop
+      if (lightingLoop < millis() + 1000) {
+        if (lightingLoopState == 0) {
+          pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(500); // Pause before next pass through loop
+          lightingLoopState = 1;
+        } else {
+          pixels.setPixelColor(1, pixels.Color(30, 30, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(500); // Pause before next pass through loop
+          lightingLoopState = 0;
+        }
+      lightingLoop = millis();
+      }
+      break;
+
+    case 2:
+      //Current Sense Lighting
+      pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+      if (lightingLoop < millis() + 1000) {
+        if (lightingLoopState == 0) {
+          pixels.setPixelColor(1, pixels.Color(0, 0, 150));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(500); // Pause before next pass through loop
+          lightingLoopState = 1;
+        } else {
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(500); // Pause before next pass through loop
+          lightingLoopState = 0;
+        }
+      lightingLoop = millis();
+      }
+      break;
+
+    case 3:
+      //Warning Lighting
+      if (lightingLoop < millis() + 500) {
+        if (lightingLoopState == 0) {
+          pixels.setPixelColor(0, pixels.Color(150, 150, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 150, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoopState = 1;
+        } else {
+          pixels.setPixelColor(0, pixels.Color(0, 150, 0));
+          pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoopState = 0;
+        }
+      lightingLoop = millis();
+      }
       break;
       
     
@@ -1379,55 +1302,6 @@ void neoPixelTask(void *parameters) {
     }
   }
 }
-
-//Screen Saver Task
-void screenSaverTask(void *parameters){
-
-  Serial.println("Screen saver task started");
-  
-  while(1){
-    if (showScreenSaver) {
-      delay(50);
-      Serial.println("Running Screen Saver");
-      pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-      pixels.show();
-      display.clearDisplay();
-      display.drawBitmap(
-      //(display.width()  - LOGO_WIDTH ) / 2,
-      random(1, (display.width() - LOGO_WIDTH)),
-      //(display.height() - LOGO_HEIGHT) / 2,
-      random(1, (display.height() - LOGO_HEIGHT)),
-      logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-      display.display();
-      for (int i = 0; i < 150; i++) {
-        if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
-          //break;
-          showScreenSaver = 0;
-          baseStationState = 1;
-          vTaskDelete(NULL);
-          }
-        delay(16);
-        // pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
-        // pixels.show();
-      }
-      for (int i = 0; i < 150; i++) {
-        if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
-          //break;
-          showScreenSaver = 0;
-          baseStationState = 1;
-          vTaskDelete(NULL);
-          }
-        delay(16);
-      // pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
-      // pixels.show();
-    }
-  }
-  delay(100);
-
-}
-}
-
-
 
 void mqttLoop(void* _this){
   Serial.println("Starting MQTT Loop");
