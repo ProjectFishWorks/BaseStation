@@ -66,7 +66,6 @@ bool shouldSaveConfig = false;
 //Screen Savers
 
 bool showScreenSaver = false;
-bool endingScreenSaver = false;
 
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
@@ -172,8 +171,23 @@ void saveConfigCallback () {
   shouldSaveConfig = true;
 }
 
+
+//Struct for Error Queue
+uint8_t errorsQueued = 0;
+typedef struct {
+  int16_t nodeID;
+  uint8_t isWarning;
+  uint8_t isSilenced = 1;
+  uint8_t isCleared = 1;
+} UIAlertData;
+
+//Array of AlertData
+UIAlertData alertQueue[50];
+
+
 //Node Controller Core - temp usage coustom code for base station is created
 BaseStationCore core;
+uint8_t baseStationState = 0;
 
 //WiFi client
 WiFiClientSecure espClient;
@@ -192,6 +206,13 @@ QueueHandle_t log_file_queue;
 void mqttLoop(void* _this); 
 
 void screenSaverTask(void *parameters);
+TaskHandle_t xHandle = NULL;
+
+void neoPixelTask(void *parameters);
+
+void mainUITask(void *parameters);
+
+void sendWarningToQueue();
 
 //Function that is called when a CAN Bus message is received
 void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
@@ -228,6 +249,22 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
         alertData.isWarning = messageID == WARN_ID ? 1 : 0;
 
         sendEmailToQueue(&alertData);
+
+        //Send to alert queue in UIAlertData, in the first slot where isCleared is set to 1
+        for(int i = 0; i < 50; i++){
+          if(alertQueue[i].isCleared == 1){
+            alertQueue[i].nodeID = nodeID;
+            alertQueue[i].isWarning = messageID == WARN_ID ? 1 : 0;
+            alertQueue[i].isSilenced = 0;
+            alertQueue[i].isCleared = 0;
+            break;
+          }
+        }
+        baseStationState = 1;
+        showScreenSaver = 0;
+        vTaskDelete( xHandle );
+        delay(10);
+
         //xQueueSend(emailQueue, &alertData, portMAX_DELAY);
       }
 
@@ -591,7 +628,6 @@ void testCurrentSense () {
   display.print(current_mA);
   display.print(" mA");
   display.display();      // Show initial text
-  delay(2000);
 
   //testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT);    // Draw a small bitmap image
   Serial.println("Success");
@@ -606,9 +642,15 @@ void createScreenSaverTask () {
     10000,  /* Stack size in words */
     NULL,  /* Task input parameter */
     1,  /* Priority of the task */
-    NULL,  /* Task handle. */
+    &xHandle,  /* Task handle. */
     0); /* Core where the task should run */
 }
+
+void sendWarningToQueue(UIAlertData *alertData) {
+  //add warning info to the UIAlertData array
+
+}
+
 
 void setup() {
     //Start the serial connection
@@ -995,14 +1037,37 @@ void setup() {
         0);         /* Core where the task should run */
 
     showScreenSaver = 1;
+    baseStationState = 0;
+
     xTaskCreatePinnedToCore(
         screenSaverTask,   /* Function to implement the task */
         "screenSaverTask", /* Name of the task */
         10000,      /* Stack size in words */
         NULL,       /* Task input parameter */
         1,          /* Priority of the task */
+        &xHandle,       /* Task handle. */
+        0);         /* Core where the task should run */
+
+    //start the main UI task
+    xTaskCreatePinnedToCore(
+        mainUITask,   /* Function to implement the task */
+        "mainUITask", /* Name of the task */
+        10000,      /* Stack size in words */
+        NULL,       /* Task input parameter */
+        1,          /* Priority of the task */
         NULL,       /* Task handle. */
         0);         /* Core where the task should run */
+
+    //start the NeoPixel task
+    xTaskCreatePinnedToCore(
+        neoPixelTask,   /* Function to implement the task */
+        "neoPixelTask", /* Name of the task */
+        10000,      /* Stack size in words */
+        NULL,       /* Task input parameter */
+        1,          /* Priority of the task */
+        NULL,       /* Task handle. */
+        0);         /* Core where the task should run */
+
 
 }
 
@@ -1013,73 +1078,309 @@ void loop() {
     //TODO: Move the email client to a separate task????????????????????
     emailClientLoop(email_recipient, email_recipient_name);
 
-    if (digitalRead(0) == LOW) {
-      //latching debounce
-      while(digitalRead(0) == LOW){
-        delay(50);
+    // if (digitalRead(0) == LOW) {
+    //   //latching debounce
+    //   while(digitalRead(0) == LOW){
+    //     delay(50);
+    //     }
+    //   }
+    // if (digitalRead(21) == LOW) {
+    //   Serial.println("Button 21 pressed");
+    //   annoyingBuzz();
+    //   //latching debounce
+    //   while(digitalRead(21) == LOW){
+    //     testCurrentSense();
+    //     delay(50);
+    //     showScreenSaver = 1;
+    //     createScreenSaverTask();
+    //     }
+    //   }
+    // if (digitalRead(47) == LOW) {
+    //   Serial.println("Button 47 pressed");
+    //   Serial.println("Press button 21 to reset");
+    //   display.clearDisplay();
+    //   display.setTextSize(1); // Draw 2X-scale text
+    //   display.setTextColor(SSD1306_WHITE);
+    //   display.setCursor(10, 10);
+    //   display.println(F("Press button 21"));
+    //   display.setCursor(20, 30);
+    //   display.println(F("to reset Fish Sense"));
+    //   display.display(); // Show initial text
+    //   delay(50);
+    //   annoyingBuzz();
+    //   while (digitalRead(47) == LOW) {
+    //     pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+    //     pixels.show();   // Send the updated pixel colors to the hardware.
+    //     delay(200); // Pause before next pass through loop
+    //     pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+    //     pixels.show();   // Send the updated pixel colors to the hardware.
+    //     delay(200); // Pause before next pass through loop
+    //     if (digitalRead(21) == LOW) {
+    //       //wm.startConfigPortal("Fish Sense Setup");
+    //       //laching debounce
+    //       Serial.println("Both buttons pressed");
+    //       Serial.println("Resetting Fish Sense");
+    //       display.clearDisplay();
+    //       display.setTextSize(1); // Draw 2X-scale text
+    //       display.setTextColor(SSD1306_WHITE);
+    //       display.setCursor(10, 10);
+    //       display.println(F("Reseting Fish Sense"));
+    //       display.setCursor(10, 30);
+    //       display.println(F("Brb......"));
+    //       display.display(); // Show initial text
+    //       for (int i=0; i<3; i++) {
+    //         pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+    //         pixels.show();   // Send the updated pixel colors to the hardware.
+    //         delay(DELAYVAL); // Pause before next pass through loop
+    //         pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+    //         pixels.show();   // Send the updated pixel colors to the hardware.
+    //         delay(DELAYVAL); // Pause before next pass through loop
+    //       }
+    //       ESP.restart();
+    //     }
+    //   } 
+    //   showScreenSaver = 1;
+    //   createScreenSaverTask();
+    // }
+    //screenSaver();
+}
+
+//Main UI Task
+void mainUITask(void *parameters) {
+  while (1) {
+    Serial.println("Main UI Task Loop, Top");
+    Serial.println(baseStationState);
+    delay(50);
+    //if there is an error in the UIAlertData, display the error message
+    for (int i = 0; i < 50; i++) {
+      if (alertQueue[i].isSilenced == 0) {
+        Serial.println("Interupt Error Page");
+        baseStationState = 1;
+        showScreenSaver = 0;
+        display.clearDisplay();
+        display.setTextSize(2); // Draw 2X-scale text
+        display.setTextColor(SSD1306_WHITE);
+        display.setCursor(10, 10);
+        display.println(F("Error:"));
+        display.setTextSize(1); // Draw 1X-scale text
+        display.setCursor(20, 30);
+        display.println(alertQueue[i].nodeID);
+        display.display(); // Show initial text
+        delay(1500);
+        while (alertQueue[i].isSilenced == 0) {       
+          annoyingBuzz();
+          delay(50);
+          if (digitalRead(21) == LOW) {
+            //latching debounce
+            while(digitalRead(21) == LOW){
+              alertQueue[i].isSilenced = 1;
+              delay(50);
+              }
+            }
+          }
+        } else {
+          if (showScreenSaver == 0 && baseStationState == 0) {
+            showScreenSaver = 1;
+            createScreenSaverTask();
+            delay(10);
+          }
+          delay(5);
         }
-      }
-    if (digitalRead(21) == LOW) {
-      Serial.println("Button 21 pressed");
-      annoyingBuzz();
-      //latching debounce
-      while(digitalRead(21) == LOW){
-        testCurrentSense();
-        delay(50);
-        showScreenSaver = 1;
-        createScreenSaverTask();
-        }
-      }
+      }  
     if (digitalRead(47) == LOW) {
-      Serial.println("Button 47 pressed");
-      Serial.println("Press button 21 to reset");
-      display.clearDisplay();
-      display.setTextSize(1); // Draw 2X-scale text
-      display.setTextColor(SSD1306_WHITE);
-      display.setCursor(10, 10);
-      display.println(F("Press button 21"));
-      display.setCursor(20, 30);
-      display.println(F("to reset Fish Sense"));
-      display.display(); // Show initial text
-      delay(50);
-      annoyingBuzz();
-      while (digitalRead(47) == LOW) {
-        pixels.setPixelColor(1, pixels.Color(150, 150, 0));
-        pixels.show();   // Send the updated pixel colors to the hardware.
-        delay(200); // Pause before next pass through loop
-        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-        pixels.show();   // Send the updated pixel colors to the hardware.
-        delay(200); // Pause before next pass through loop
-        if (digitalRead(21) == LOW) {
-          //wm.startConfigPortal("Fish Sense Setup");
-          //laching debounce
-          Serial.println("Both buttons pressed");
-          Serial.println("Resetting Fish Sense");
+        if (baseStationState < 2) {
+          baseStationState ++;
+          Serial.println(baseStationState);
+        } else {
+          baseStationState = 0;
+          Serial.println(baseStationState);
+        }
+      //latching debounce
+      while(digitalRead(47) == LOW){
+        delay(10);
+        }
+      }
+    Serial.println("Main UI Task Loop, pre state 1");
+    if (baseStationState == 1) {
+      Serial.println("Error Page");
+      for (int i = 0; i < 50; i++) {
+        if (alertQueue[i].isCleared == 0) {
+          baseStationState = 1;
+          showScreenSaver = 0;
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setTextColor(SSD1306_WHITE);
+          display.setCursor(10, 10);
+          display.println(F("Error:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(20, 30);
+          display.println(alertQueue[i].nodeID);
+          display.display(); // Show initial text
+          while (alertQueue[i].isCleared == 0) {     
+            delay(50);
+            if (digitalRead(21) == LOW) {
+              //latching debounce
+              while(digitalRead(21) == LOW){
+                alertQueue[i].isCleared = 1;
+                delay(5);
+              }
+            }
+          }
+        } else {
           display.clearDisplay();
           display.setTextSize(1); // Draw 2X-scale text
           display.setTextColor(SSD1306_WHITE);
           display.setCursor(10, 10);
-          display.println(F("Reseting Fish Sense"));
+          display.println(F("No Errors!"));
           display.setCursor(10, 30);
-          display.println(F("Brb......"));
+          display.println(F("Happy Fishes"));
           display.display(); // Show initial text
-          for (int i=0; i<3; i++) {
-            pixels.setPixelColor(1, pixels.Color(150, 0, 0));
-            pixels.show();   // Send the updated pixel colors to the hardware.
-            delay(DELAYVAL); // Pause before next pass through loop
-            pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-            pixels.show();   // Send the updated pixel colors to the hardware.
-            delay(DELAYVAL); // Pause before next pass through loop
+          delay(10);
           }
-          ESP.restart();
-        }
-      } 
-      showScreenSaver = 1;
-      createScreenSaverTask();
+        if (digitalRead(47) == LOW) {
+          baseStationState ++;
+          Serial.println(baseStationState);
+          //latching debounce
+          while(digitalRead(47) == LOW){
+            delay(10);
+            }
+          }
+        delay(10);
+      }
     }
-    //screenSaver();
+    Serial.println("Main UI Task Loop, pre state 2");
+    if (baseStationState == 2) {
+      Serial.println("Current Sense Page");
+      testCurrentSense();
+      for (int i=0; i > 40; i++) {
+        if (digitalRead(47) == LOW) {
+          baseStationState = 0;
+          Serial.println(baseStationState);
+          //latching debounce
+          while(digitalRead(47) == LOW){
+            delay(10);
+            }
+          }
+        delay(25);
+      }
+    }
+    Serial.println("Main UI Task Loop, pre state 0");
+    if (baseStationState == 0) {
+      if (showScreenSaver == 0) {
+        Serial.println("Screen Saver Starting");
+        showScreenSaver = 1;
+        createScreenSaverTask();
+        delay(10);
+    }
+  delay(10);
+  }
+}
+}
+    // if (digitalRead(21) == LOW) {
+    //   Serial.println("Button 21 pressed");
+    //   annoyingBuzz();
+    //   //latching debounce
+    //   while(digitalRead(21) == LOW){
+    //     testCurrentSense();
+    //     delay(50);
+    //     showScreenSaver = 1;
+    //     createScreenSaverTask();
+    //     }
+    //   }
+    // if (digitalRead(47) == LOW) {
+    //   Serial.println("Button 47 pressed");
+    //   Serial.println("Press button 21 to reset");
+    //   display.clearDisplay();
+    //   display.setTextSize(1); // Draw 2X-scale text
+    //   display.setTextColor(SSD1306_WHITE);
+    //   display.setCursor(10, 10);
+    //   display.println(F("Press button 21"));
+    //   display.setCursor(20, 30);
+    //   display.println(F("to reset Fish Sense"));
+    //   display.display(); // Show initial text
+    //   delay(50);
+    //   annoyingBuzz();
+    //   while (digitalRead(47) == LOW) {
+    //     pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+    //     pixels.show();   // Send the updated pixel colors to the hardware.
+    //     delay(200); // Pause before next pass through loop
+    //     pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+    //     pixels.show();   // Send the updated pixel colors to the hardware.
+    //     delay(200); // Pause before next pass through loop
+    //     if (digitalRead(21) == LOW) {
+    //       //wm.startConfigPortal("Fish Sense Setup");
+    //       //laching debounce
+    //       Serial.println("Both buttons pressed");
+    //       Serial.println("Resetting Fish Sense");
+    //       display.clearDisplay();
+    //       display.setTextSize(1); // Draw 2X-scale text
+    //       display.setTextColor(SSD1306_WHITE);
+    //       display.setCursor(10, 10);
+    //       display.println(F("Reseting Fish Sense"));
+    //       display.setCursor(10, 30);
+    //       display.println(F("Brb......"));
+    //       display.display(); // Show initial text
+    //       for (int i=0; i<3; i++) {
+    //         pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+    //         pixels.show();   // Send the updated pixel colors to the hardware.
+    //         delay(DELAYVAL); // Pause before next pass through loop
+    //         pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+    //         pixels.show();   // Send the updated pixel colors to the hardware.
+    //         delay(DELAYVAL); // Pause before next pass through loop
+    //       }
+    //       ESP.restart();
+    //     }
+    //   } 
+    //   showScreenSaver = 1;
+    //   createScreenSaverTask();
+    // }
+
+void neoPixelTask(void *parameters) {
+  while (1) {
+    //if there is an error in the UIAlertData, display the error message
+    //switch case to control the neopixel's
+    switch (baseStationState)
+    {
+    case 0:
+      //Screen Saver breathing
+      for (int i = 0; i < 150; i++) {
+        if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+          break;
+        }
+        delay(16);
+        pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+        pixels.show();
+      }
+      for (int i = 0; i < 150; i++) {
+        if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+          break;
+        }
+        delay(16);
+        pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
+        pixels.show();
+      }
+      break;
+    case 1:
+      //Warning Lighting
+      pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+      pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+      pixels.show();   // Send the updated pixel colors to the hardware.
+      delay(750); // Pause before next pass through loop
+      pixels.setPixelColor(0, pixels.Color(150, 150, 0));
+      pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+      pixels.show();   // Send the updated pixel colors to the hardware.
+      delay(750); // Pause before next pass through loop
+      break;
+      
+    
+    default:
+      delay(100);
+      break;
+    }
+  }
 }
 
+//Screen Saver Task
 void screenSaverTask(void *parameters){
 
   Serial.println("Screen saver task started");
@@ -1087,7 +1388,6 @@ void screenSaverTask(void *parameters){
   while(1){
     if (showScreenSaver) {
       delay(50);
-      endingScreenSaver = 1;
       Serial.println("Running Screen Saver");
       pixels.setPixelColor(1, pixels.Color(0, 0, 0));
       pixels.show();
@@ -1103,33 +1403,31 @@ void screenSaverTask(void *parameters){
         if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
           //break;
           showScreenSaver = 0;
+          baseStationState = 1;
           vTaskDelete(NULL);
           }
         delay(16);
-        pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
-        pixels.show();
+        // pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+        // pixels.show();
       }
       for (int i = 0; i < 150; i++) {
         if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
           //break;
           showScreenSaver = 0;
+          baseStationState = 1;
           vTaskDelete(NULL);
           }
-      delay(16);
-      pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
-      pixels.show();
+        delay(16);
+      // pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
+      // pixels.show();
     }
-  }
-  if (endingScreenSaver == 1 && showScreenSaver == 0){
-    Serial.println("Screen saver off");
-    pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-    pixels.show();
-    endingScreenSaver = 0;
   }
   delay(100);
 
 }
 }
+
+
 
 void mqttLoop(void* _this){
   Serial.println("Starting MQTT Loop");
