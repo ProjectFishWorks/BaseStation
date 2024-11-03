@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x01
+#define baseStationID 0x00
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -769,7 +769,7 @@ void setup() {
       Serial.println(WiFi.softAPIP());
       Serial.println(myWiFiManager->getConfigPortalSSID());
 
-      pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to red
+      pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to blue
       pixels.show(); // Set status pixel to red
 
       display.clearDisplay();
@@ -937,7 +937,7 @@ void setup() {
         NULL,       /* Task input parameter */
         1,          /* Priority of the task */
         NULL,       /* Task handle. */
-        0);         /* Core where the task should run */
+        1);         /* Core where the task should run */
 
     //start the NeoPixel task
     xTaskCreatePinnedToCore(
@@ -947,7 +947,7 @@ void setup() {
         NULL,       /* Task input parameter */
         1,          /* Priority of the task */
         NULL,       /* Task handle. */
-        0);         /* Core where the task should run */
+        1);         /* Core where the task should run */
 
 
 }
@@ -1074,7 +1074,6 @@ void mainUIDisplayTask(void *parameters) {
 
             display.println(deviceName);
             display.display(); // Show initial text
-            delay(5);
             while (alertQueue[i].isCleared == 0) {     
               delay(25);
               for (int e = 0; e < 50; e++) {
@@ -1091,7 +1090,7 @@ void mainUIDisplayTask(void *parameters) {
                 alertQueue[i].isCleared = 1;
                 //latching debounce
                 while(digitalRead(21) == LOW){
-                  delay(25);
+                  delay(10);
                   }
                   break;
                 }
@@ -1112,6 +1111,7 @@ void mainUIDisplayTask(void *parameters) {
           display.setCursor(10, 30);
           display.println(F("Happy Fishes"));
           display.display(); // Show initial text
+          delay(25);
           break;
 
       case 2:
@@ -1144,7 +1144,7 @@ void mainUIDisplayTask(void *parameters) {
             display.println(F("!!Error:"));
             display.setTextSize(1); // Draw 1X-scale text
             display.setCursor(20, 30);
-            
+
             String deviceName = "Node " + String(alertQueue[i].nodeID);
 
             //Send manifest data to the MQTT broker
@@ -1199,6 +1199,7 @@ void mainUIDisplayTask(void *parameters) {
                 }
               }
             }
+            delay(25);
           }
           Serial.println("Exiting Interupt Screen");
           baseStationState = 1;
@@ -1225,73 +1226,87 @@ void neoPixelTask(void *parameters) {
         if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
           break;
         }
-        delay(16);
+        pixels.clear();
         pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
         pixels.show();
+        delay(100);
       }
       for (int i = 0; i < 150; i++) {
         if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
           break;
         }
-        delay(16);
+        pixels.clear();
         pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
+        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
         pixels.show();
+        delay(100);
       }
       break;
 
     case 1:
       //Error Lighting
-      pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-      if (lightingLoop < millis() + 1000) {
+      if (lightingLoop < millis() + 2000) {
         if (lightingLoopState == 0) {
+        pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(150, 0, 0));
           pixels.setPixelColor(1, pixels.Color(150, 150, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
-          delay(500); // Pause before next pass through loop
           lightingLoopState = 1;
+          lightingLoop = millis();
+          delay(100); // Pause before next pass through loop
         } else {
-          pixels.setPixelColor(1, pixels.Color(30, 30, 0));
+        pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
-          delay(500); // Pause before next pass through loop
           lightingLoopState = 0;
+          delay(100); // Pause before next pass through loop
         }
-      lightingLoop = millis();
       }
       break;
 
     case 2:
       //Current Sense Lighting
-      pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-      if (lightingLoop < millis() + 1000) {
+      if (lightingLoop < millis() + 2000) {
         if (lightingLoopState == 0) {
+        pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(150, 0, 0));
           pixels.setPixelColor(1, pixels.Color(0, 0, 150));
           pixels.show();   // Send the updated pixel colors to the hardware.
-          delay(500); // Pause before next pass through loop
           lightingLoopState = 1;
+          lightingLoop = millis();
+          delay(100); // Pause before next pass through loop
         } else {
+        pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(150, 0, 0));
           pixels.setPixelColor(1, pixels.Color(0, 0, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
-          delay(500); // Pause before next pass through loop
           lightingLoopState = 0;
+          delay(100); // Pause before next pass through loop
         }
-      lightingLoop = millis();
       }
       break;
 
     case 3:
       //Warning Lighting
-      if (lightingLoop < millis() + 500) {
+      if (lightingLoop < millis() + 1000) {
         if (lightingLoopState == 0) {
-          pixels.setPixelColor(0, pixels.Color(150, 150, 0));
+        pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(0, 150, 0));
           pixels.setPixelColor(1, pixels.Color(0, 150, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoop = millis();
           lightingLoopState = 1;
+          delay(100);
         } else {
-          pixels.setPixelColor(0, pixels.Color(0, 150, 0));
-          pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+        pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(0, 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(100);
           lightingLoopState = 0;
         }
-      lightingLoop = millis();
       }
       break;
       
