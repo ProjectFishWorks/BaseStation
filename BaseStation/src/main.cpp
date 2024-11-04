@@ -50,6 +50,8 @@ char mqtt_password[255] = "F1shworks!";
 char email_recipient[255] = "sebastien@robitaille.info";
 char email_recipient_name[255] = "Sebastien Robitaille";
 
+TaskHandle_t xMQTTloop = NULL;
+
 //Time
 //TODO: add timezone support to WiFiManager
 #define ntpServer "pool.ntp.org"
@@ -64,12 +66,13 @@ char email_recipient_name[255] = "Sebastien Robitaille";
 bool shouldSaveConfig = false;
 
 //Screen Savers
-
+long lastInput;
 
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
 #define NUMPIXELS   2 // Popular NeoPixel ring size
 #define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
+int errorQueued = 0; //Flag to indicate if an error has been queued for the NeoPixel
 
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 
@@ -338,6 +341,12 @@ void MQTTConnect() {
   }
 }
 
+void MQTTdisconnect() {
+  mqttClient.disconnect();
+  //end the MQTT task
+  vTaskDelete(xMQTTloop);
+}
+
 void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 /*   Serial.print("Message arrived [");
   Serial.print(topic);
@@ -477,13 +486,16 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 }
 
 void annoyingBuzz() {
+  if (digitalRead(1) == HIGH) {
   //for(int i = 0; i < 1; i++){
     digitalWrite(48, HIGH);
     Serial.println("Bzzzzz");
     delay(50);
     digitalWrite(48, LOW);
     //delay(100);
-  //}
+  } else {
+    Serial.println("Buzzer is off");
+  }
 }
 
 void testCurrentSense () {
@@ -502,6 +514,7 @@ void setup() {
 
     // Setup the onboard GPIO
     pinMode(0, INPUT_PULLUP);  //Program button with pullup
+    pinMode(1, INPUT_PULLUP);  //Reset button with pullup
     pinMode(21, INPUT_PULLUP); //ButtBlue
     pinMode(47, INPUT_PULLUP); //ButtWhite
     pinMode(48, OUTPUT); //Buzzer
@@ -880,7 +893,7 @@ void setup() {
         10000,      /* Stack size in words */
         NULL,       /* Task input parameter */
         1,          /* Priority of the task */
-        NULL,       /* Task handle. */
+        &xMQTTloop,  /* Task handle. */
         0);         /* Core where the task should run */
 
 
@@ -912,8 +925,42 @@ void setup() {
 void loop() {
 
     emailClientLoop(email_recipient, email_recipient_name);
+
+    //Go to screen saver after 5 seconds should no button be pressed
+    if (baseStationState == 1 || baseStationState == 2) {
+      if (millis() >= lastInput + 5000) {
+        Serial.println("Screen Saver Timeout");
+        baseStationState = 0;
+      }
+    }
+
+    if (digitalRead(0) == LOW) {
+      if (digitalRead(11) == HIGH) {
+        Serial.println("CANBus Off");
+        screenSaverRunning = false;
+        baseStationState = 5;
+        MQTTdisconnect();
+        digitalWrite(11, LOW);
+      } else {
+        Serial.println("CANBus On");
+        screenSaverRunning = false;
+        baseStationState = 0;    
+        xTaskCreatePinnedToCore(
+          mqttLoop,   /* Function to implement the task */
+          "mqttLoop", /* Name of the task */
+          10000,      /* Stack size in words */
+          NULL,       /* Task input parameter */
+          1,          /* Priority of the task */
+          &xMQTTloop,  /* Task handle. */
+          0);         /* Core where the task should run */
+      }
+      while (digitalRead(0) == LOW) {
+        delay(10);
+      }
+    }
     if (digitalRead(21) == LOW) {
       screenSaverRunning = false;
+      lastInput = millis();
       while (digitalRead(21) == LOW) {
         delay(10);
       }
@@ -921,6 +968,7 @@ void loop() {
     if (digitalRead(47) == LOW) {
       Serial.println("Button 47 pressed");
       screenSaverRunning = false;
+      lastInput = millis();
       if (baseStationState == 3) {
         } else {
         if (baseStationState > 1) {
@@ -991,7 +1039,7 @@ void mainUIDisplayTask(void *parameters) {
             display.println(i + 1);
             display.setTextSize(1); // Draw 1X-scale text
             display.setCursor(20, 30);
-
+            errorQueued = 1;
             String deviceName = "Node " + String(alertQueue[i].nodeID);
 
             //Send manifest data to the MQTT broker
@@ -1048,12 +1096,14 @@ void mainUIDisplayTask(void *parameters) {
                 while(digitalRead(21) == LOW){
                   delay(10);
                   }
+                  lastInput = millis();
                   break;
                 }
                 if (digitalRead(47) == LOW) {
                   while(digitalRead(47) == LOW) {
                     delay(10);
                     }
+                    lastInput = millis();
                     break;
                   }
               }
@@ -1067,6 +1117,7 @@ void mainUIDisplayTask(void *parameters) {
           display.setCursor(10, 30);
           display.println(F("Happy Fishes"));
           display.display(); // Show initial text
+          errorQueued = 0;
           delay(25);
           break;
 
@@ -1161,6 +1212,24 @@ void mainUIDisplayTask(void *parameters) {
           baseStationState = 1;
           break;
 
+      case 4:
+        //Base Station Utilities
+        delay(25);
+        break;
+
+      case 5:
+        //CANBus OFF
+        display.clearDisplay();
+        display.setTextSize(2); // Draw 2X-scale text
+        display.setTextColor(SSD1306_WHITE);
+        display.setCursor(10, 10);
+        display.println(F("CANBus"));
+        display.setCursor(10, 30);
+        display.println(F("Offline"));
+        display.display(); // Show initial text
+        delay(25);
+        break;
+
       default:
         delay(25);
         break;
@@ -1179,88 +1248,119 @@ void neoPixelTask(void *parameters) {
     case 0:
       //Screen Saver breathing
       for (int i = 0; i < 150; i++) {
-        if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+        if (baseStationState != 0) {
           break;
         }
         pixels.clear();
         pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
         pixels.setPixelColor(1, pixels.Color(0, 0, 0));
         pixels.show();
-        delay(100);
+        delay(25);
       }
       for (int i = 0; i < 150; i++) {
-        if (digitalRead(21) == LOW || digitalRead(47) == LOW) {
+        if (baseStationState != 0) {
           break;
         }
         pixels.clear();
         pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
         pixels.setPixelColor(1, pixels.Color(0, 0, 0));
         pixels.show();
-        delay(100);
+        delay(25);
       }
       break;
 
     case 1:
       //Error Lighting
-      if (lightingLoop < millis() + 2000) {
-        if (lightingLoopState == 0) {
-        pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-          pixels.setPixelColor(1, pixels.Color(150, 150, 0));
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          lightingLoopState = 1;
+      if (errorQueued == 1) {
+        if (millis() >= lightingLoop + 1500) {
           lightingLoop = millis();
-          delay(100); // Pause before next pass through loop
-        } else {
-        pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          lightingLoopState = 0;
-          delay(100); // Pause before next pass through loop
+          if (lightingLoopState == 0) {
+            pixels.clear();
+            pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+            pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+            pixels.show();   // Send the updated pixel colors to the hardware.
+            lightingLoopState = 1;
+            delay(25); // Pause before next pass through loop
+          } else {
+            pixels.clear();
+            pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+            pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+            pixels.show();   // Send the updated pixel colors to the hardware.
+            lightingLoopState = 0;
+            delay(25); // Pause before next pass through loop
+          }
         }
+        break;
+      } else {
+        pixels.clear();
+        pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+        pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+        pixels.show();   // Send the updated pixel colors to the hardware.
+        delay(25);
+        break;
       }
-      break;
 
     case 2:
       //Current Sense Lighting
-      if (lightingLoop < millis() + 2000) {
+      if (millis() >= lightingLoop + 1500) {
+        lightingLoop = millis();
         if (lightingLoopState == 0) {
-        pixels.clear();
+          pixels.clear();
           pixels.setPixelColor(0, pixels.Color(150, 0, 0));
           pixels.setPixelColor(1, pixels.Color(0, 0, 150));
           pixels.show();   // Send the updated pixel colors to the hardware.
           lightingLoopState = 1;
-          lightingLoop = millis();
-          delay(100); // Pause before next pass through loop
+          delay(25); // Pause before next pass through loop
         } else {
-        pixels.clear();
+          pixels.clear();
           pixels.setPixelColor(0, pixels.Color(150, 0, 0));
           pixels.setPixelColor(1, pixels.Color(0, 0, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
           lightingLoopState = 0;
-          delay(100); // Pause before next pass through loop
+          delay(25); // Pause before next pass through loop
         }
       }
       break;
 
     case 3:
       //Warning Lighting
-      if (lightingLoop < millis() + 1000) {
+      if (millis() >= lightingLoop + 1000) {
+        lightingLoop = millis();
         if (lightingLoopState == 0) {
-        pixels.clear();
+          pixels.clear();
           pixels.setPixelColor(0, pixels.Color(0, 150, 0));
           pixels.setPixelColor(1, pixels.Color(0, 150, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
-          lightingLoop = millis();
           lightingLoopState = 1;
-          delay(100);
+          delay(25);
         } else {
-        pixels.clear();
+          pixels.clear();
           pixels.setPixelColor(0, pixels.Color(0, 0, 0));
           pixels.setPixelColor(1, pixels.Color(0, 0, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
-          delay(100);
+          delay(25);
+          lightingLoopState = 0;
+        }
+      }
+      break;
+
+    case 5:
+      //CANBus OFF
+      if (millis() >= lightingLoop + 1000) {
+        lightingLoop = millis();
+        if (lightingLoopState == 0) {
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(0, 150, 150));
+          pixels.setPixelColor(1, pixels.Color(0, 150, 150));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoopState = 1;
+          delay(25);
+        } else {
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(0, 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(25);
           lightingLoopState = 0;
         }
       }
