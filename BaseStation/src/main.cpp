@@ -65,12 +65,13 @@ bool shouldSaveConfig = false;
 
 //Screen Savers
 
-bool screenSaverRunning;
 
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
 #define NUMPIXELS   2 // Popular NeoPixel ring size
 #define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
+
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 
 
 //LCD Screen Setup Stuffs
@@ -78,9 +79,11 @@ bool screenSaverRunning;
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
-#define NUMFLAKES     3 // Number of snowflakes in the animation example
 #define LOGO_HEIGHT   48
 #define LOGO_WIDTH    64
+bool screenSaverRunning;
+int LCD_SDA = 13;
+int LCD_SCL = 14;
 static const unsigned char PROGMEM logo_bmp[] =
 /**
  * Made with Marlin Bitmap Converter
@@ -139,31 +142,20 @@ static const unsigned char PROGMEM logo_bmp[] =
   B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000
 };
 
-// { 0b00000000, 0b11000000,
-//   0b00000001, 0b11000000,
-//   0b00000001, 0b11000000,
-//   0b00000011, 0b11100000,
-//   0b11110011, 0b11100000,
-//   0b11111110, 0b11111000,
-//   0b01111110, 0b11111111,
-//   0b00110011, 0b10011111,
-//   0b00011111, 0b11111100,
-//   0b00001101, 0b01110000,
-//   0b00011011, 0b10100000,
-//   0b00111111, 0b11100000,
-//   0b00111111, 0b11110000,
-//   0b01111100, 0b11110000,
-//   0b01110000, 0b01110000,
-//   0b00000000, 0b00110000 };
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-int LCD_SDA = 13;
-int LCD_SCL = 14;
+//Current Sense Setup Stuffs
+float shuntvoltage = 0;
+float busvoltage = 0;
+float current_mA = 0;
+float loadvoltage = 0;
+float power_mW = 0;
 int CUR_SDA = 9;
 int CUR_SCL = 10;
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Adafruit_INA219 ina219(0x4A);
-Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
+
+
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -181,18 +173,12 @@ typedef struct {
   uint8_t isCleared = 1;
 } UIAlertData;
 
-//Current Sense Variables
-float shuntvoltage = 0;
-float busvoltage = 0;
-float current_mA = 0;
-float loadvoltage = 0;
-float power_mW = 0;
 
 //Array of AlertData
 UIAlertData alertQueue[50];
 
 
-//Node Controller Core - temp usage coustom code for base station is created
+//Base Station Core - temp usage coustom code for base station is created
 BaseStationCore core;
 uint8_t baseStationState = 0;
 
@@ -209,13 +195,10 @@ QueueHandle_t log_file_queue;
 //Global data fix for pointer issues, TODO fix this shit
 //uint64_t data = 0;
 
-//MQTT Loop Task
+//Prototypes
 void mqttLoop(void* _this); 
-
 void neoPixelTask(void *parameters);
-
 void mainUIDisplayTask(void *parameters);
-
 void sendWarningToQueue();
 
 //Function that is called when a CAN Bus message is received
@@ -504,67 +487,36 @@ void annoyingBuzz() {
 }
 
 void testCurrentSense () {
-  Serial.println("Testing current");
-
-  shuntvoltage = ina219.getShuntVoltage_mV();
-  busvoltage = ina219.getBusVoltage_V();
+  //Serial.println("Testing current");
+  //shuntvoltage = ina219.getShuntVoltage_mV();
+  //busvoltage = ina219.getBusVoltage_V();
   current_mA = ina219.getCurrent_mA();
-  power_mW = ina219.getPower_mW();
-  loadvoltage = busvoltage + (shuntvoltage / 1000);
-  
-  // Serial.print("Bus Voltage:   "); Serial.print(busvoltage); Serial.println(" V");
-  // Serial.print("Shunt Voltage: "); Serial.print(shuntvoltage); Serial.println(" mV");
-  // Serial.print("Load Voltage:  "); Serial.print(loadvoltage); Serial.println(" V");
-  // Serial.print("Current:       "); Serial.print(current_mA); Serial.println(" mA");
-  // Serial.print("Power:         "); Serial.print(power_mW); Serial.println(" mW");
-  // Serial.println("");
-
-  // display.clearDisplay();
-  // display.setTextSize(2); // Draw 2X-scale text
-  // display.setCursor(1, 10);
-  // display.println(F("Current is"));
-  // display.setTextSize(1); // Draw 1X-scale text
-  // display.setCursor(1, 30);
-  // display.print(current_mA);
-  // display.print(" mA");
-  // display.display();      // Show initial text
-
-  //testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT);    // Draw a small bitmap image
-  Serial.println("Success");
+  //power_mW = ina219.getPower_mW();
+  //loadvoltage = busvoltage + (shuntvoltage / 1000);
+  //Serial.println("Success");
 }
 
 void setup() {
-    //Start the serial connection
+    // Start the serial connection
     Serial.begin(115200);
 
+    // Setup the onboard GPIO
     pinMode(0, INPUT_PULLUP);  //Program button with pullup
     pinMode(21, INPUT_PULLUP); //ButtBlue
     pinMode(47, INPUT_PULLUP); //ButtWhite
     pinMode(48, OUTPUT); //Buzzer
-
     pinMode(11, OUTPUT); //CAN Bus Power
     digitalWrite(11, LOW);
 
-    
+    // Setup I2C connections
     Wire.begin(LCD_SDA, LCD_SCL);
     Wire1.begin(CUR_SDA, CUR_SCL);
-    //I2Cone.begin(LCD_SDA, LCD_SCL);
-    //I2Ctwo.begin(CUR_SDA, CUR_SCL);
     
+    // Connect and beging the LCD Screen
     if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
       Serial.println(F("SSD1306 allocation failed"));
       for(;;); // Don't proceed, loop forever
-      }
-    if (! ina219.begin(&Wire1)) {
-      Serial.println("Failed to find INA219 chip");
-      while (1) { delay(10); }
     }
-    ina219.setCalibration_16V_400mA();
-
-
-
-    // Show initial display buffer contents on the screen --
-    // the library initializes this with an Adafruit splash screen.
     display.clearDisplay();
     display.drawBitmap(
       (display.width()  - LOGO_WIDTH ) / 2,
@@ -574,8 +526,20 @@ void setup() {
     delay(1000);
     Serial.println(F("Initialized LCD Screen"));
 
+    // Connect and begin the current sensor
+    if (! ina219.begin(&Wire1)) {
+      Serial.println("Failed to find INA219 chip");
+      while (1) { delay(10); }
+    }
+    // Custoum calibration values for the current sensor (ussing the 16V entry as template, 
+    // it is actually setup for 24v. But not well. Further testing required)
+    ina219.setCalibration_16V_400mA();
 
-    //NeoPixel Setup Stuffs part 2
+
+
+
+
+    // Connect and begin the NeoPixels
     #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
     clock_prescale_set(clock_div_1);
     #endif
@@ -589,7 +553,7 @@ void setup() {
     Serial.println(F("Initialized NeoPixel"));
 
 
-
+    // Initial Boot Dialog
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
@@ -609,14 +573,16 @@ void setup() {
     display.display();      // Show initial text
     delay(2000);
 
+    // Setup the SD Card and File System
     if (!LittleFS.begin(1)) {
       Serial.println("LittleFS Mount Failed");
       //TODO: stall startup here
       return;
     }
-
     Serial.println("LittleFS Mount Successful");
+
     pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status neopixel to green
+    pixels.setPixelColor(1, pixels.Color(150, 150, 0)); //Turn on status neopixel to yellow
     pixels.show(); // Set status pixel to green
     delay(500);
 
@@ -701,12 +667,14 @@ void setup() {
     display.setCursor(10, 10);
     display.println(F("Hold both buttons"));
     display.setCursor(20, 30);
-    display.println(F("to rst wifi.."));
+    display.println(F("to enter BIOS."));
     display.display(); // Show initial text
     for (int i=0; i<4; i++) {
+      pixels.setPixelColor(0, pixels.Color(150, 0, 0));
       pixels.setPixelColor(1, pixels.Color(0, 0, 150));
       pixels.show();   // Send the updated pixel colors to the hardware.
       delay(250); // Pause before next pass through loop
+      pixels.setPixelColor(0, pixels.Color(150, 0, 0));
       pixels.setPixelColor(1, pixels.Color(0, 0, 0));
       pixels.show();   // Send the updated pixel colors to the hardware.
       delay(250); // Pause before next pass through loop
@@ -714,13 +682,14 @@ void setup() {
 
     //delay(2000);
     if (digitalRead(21) == LOW && digitalRead(47) == LOW) {
+      pixels.setPixelColor(0, pixels.Color(0, 0, 150)); //Turn status pixel to green
       pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to blue
       pixels.show(); // Set status pixel to red
       display.clearDisplay();
       display.setTextSize(1); // Draw 2X-scale text
       display.setTextColor(SSD1306_WHITE);
       display.setCursor(10, 10);
-      display.println(F("Reseting Wifi.."));
+      display.println(F("Starting BIOS.."));
       display.setCursor(20, 30);
       display.println(F("........"));
       display.display(); // Show initial text
@@ -729,7 +698,7 @@ void setup() {
       display.setTextSize(1); // Draw 2X-scale text
       display.setTextColor(SSD1306_WHITE);
       display.setCursor(5, 5);
-      display.println(F("Didnt Connect Wifi!"));
+      display.println(F("To enter BIOS,"));
       display.setCursor(5, 14);
       display.println(F("Please connect to:"));
       display.setCursor(5, 23);
@@ -737,15 +706,15 @@ void setup() {
       display.print("Fish Sense Setup");
       display.println(F(" >"));
       display.setCursor(5, 32);
-      display.println(F("to enter your WiFi"));
+      display.println(F("and navigate to"));
       display.setCursor(5, 41);
-      display.println(("at the web page: "));
+      display.println(("the web page at"));
       display.setCursor(5, 50);
       display.println(F("http://10.10.1.1"));
       display.display();     
-      //wm.resetSettings();
       wm.startConfigPortal("Fish Sense Setup");
     }
+    pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn status pixel to green
     pixels.setPixelColor(1, pixels.Color(150, 150, 0)); //Turn status pixel to yellow
     pixels.show(); // Set status pixel to green
     display.clearDisplay();
@@ -769,6 +738,7 @@ void setup() {
       Serial.println(WiFi.softAPIP());
       Serial.println(myWiFiManager->getConfigPortalSSID());
 
+      pixels.setPixelColor(0, pixels.Color(0, 0, 150)); //Turn status pixel to blue
       pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to blue
       pixels.show(); // Set status pixel to red
 
@@ -790,10 +760,8 @@ void setup() {
       display.setCursor(5, 50);
       display.print(F("http://"));
       display.println(WiFi.softAPIP());
-
       display.display();      // Show initial text
-      //display.startscrollleft(0x00, 0xFF);
-      delay(200);
+      delay(25);
 
     });
 
@@ -812,9 +780,6 @@ void setup() {
         Serial.println("WiFi connected");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
-        pixels.setPixelColor(1, pixels.Color(150, 0, 0)); //Turn status pixel to green
-        pixels.show(); // Set status pixel to green
-        delay(500);
     }
 
     //read updated parameters
@@ -878,16 +843,18 @@ void setup() {
     core = BaseStationCore();
     if(core.Init(receivedCANBUSMessage, 0x00)){
         Serial.println("Node Controller Core Started");
+        pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status pixel to green
+        pixels.setPixelColor(1, pixels.Color(150, 0, 0)); //Turn on status pixel to green
+        pixels.show(); // Set status pixel to green
     } else {
         Serial.println("Node Controller Core Failed to Start");
+        pixels.setPixelColor(0, pixels.Color(0, 150, 0)); //Turn on status pixel to green
+        pixels.setPixelColor(1, pixels.Color(0, 150, 0)); //Turn on status pixel to green
+        pixels.show(); // Set status pixel to green
     }
 
     digitalWrite(48, LOW); //Turn off the buzzer
-    digitalWrite(3, HIGH); //Turn on the LCD Backlight
-    digitalWrite(19, HIGH); //Keep LCD on
 
-    pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status pixel to green
-    pixels.show(); // Set status pixel to green
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
@@ -906,7 +873,6 @@ void setup() {
     display.println(F("Good Night~~"));
     display.display(); // Show initial text
     delay(1000);
-    //LCD Screen Setup Stuffs part 2  
 
     xTaskCreatePinnedToCore(
         mqttLoop,   /* Function to implement the task */
@@ -918,16 +884,6 @@ void setup() {
         0);         /* Core where the task should run */
 
 
-    baseStationState = 0;
-
-    // xTaskCreatePinnedToCore(
-    //     screenSaverTask,   /* Function to implement the task */
-    //     "screenSaverTask", /* Name of the task */
-    //     10000,      /* Stack size in words */
-    //     NULL,       /* Task input parameter */
-    //     1,          /* Priority of the task */
-    //     &xHandle,       /* Task handle. */
-    //     0);         /* Core where the task should run */
 
     //start the main UI task
     xTaskCreatePinnedToCore(
@@ -950,10 +906,10 @@ void setup() {
         1);         /* Core where the task should run */
 
 
+    baseStationState = 0;
 }
 
 void loop() {
-    delay(10);
 
     emailClientLoop(email_recipient, email_recipient_name);
     if (digitalRead(21) == LOW) {
@@ -966,7 +922,6 @@ void loop() {
       Serial.println("Button 47 pressed");
       screenSaverRunning = false;
       if (baseStationState == 3) {
-        delay(10);
         } else {
         if (baseStationState > 1) {
           baseStationState = 0;
@@ -977,7 +932,7 @@ void loop() {
         Serial.println(baseStationState);
         //latching debounce
         while(digitalRead(47) == LOW){
-          delay(25);
+          delay(10);
           }
       }
       for (int i = 0; i < 50; i++) {
@@ -985,6 +940,7 @@ void loop() {
             baseStationState = 3;
           }
       }
+    delay(25);
     
 }
 
