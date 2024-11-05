@@ -21,7 +21,7 @@ twai_message_t BaseStationCore::create_message(uint16_t messageID, uint8_t nodeI
   return message;
 }
 
-bool BaseStationCore::Init(std::function<void(uint8_t nodeID, uint16_t messageID, uint64_t data)> onMessageReceived, uint8_t nodeID)
+bool BaseStationCore::Init(std::function<void(uint8_t nodeID, uint16_t messageID, uint8_t logMessage,uint64_t data)> onMessageReceived, uint8_t nodeID)
 {
   this->debug = debug;
   this->onMessageReceived = onMessageReceived;
@@ -182,27 +182,36 @@ void BaseStationCore::rx_queue_event() {
       uint64_t data = 0;
       uint8_t nodeID = 0;
       uint16_t messageID = 0;
+      uint8_t logMessage = 0;
 
       //Extract the data from the message data
       memcpy(&data, message.data, 8);
 
       //Extract the nodeID and messageID from the message identifier with format:
-      //8bit node ID, 16bit message ID, 5bit reserved
+      //8bit node ID, 16bit message ID, 4bit reserved, 1bit logMessage(0=log, 1=dont log)
 		  //NNMMMMRR
-      //(NNNN)(NNNN)(MMMM)(MMMM)(MMMM)(MMMM)(RRRR)(R000)
+      //(NNNN)(NNNN)(MMMM)(MMMM)(MMMM)(MMMM)(RRRR)(L000)
+
+      Serial.print("Message ID: ");
+      Serial.println(message.identifier, BIN);
+
       nodeID = message.identifier >> 21;
       messageID = message.identifier >> 5;
+      logMessage = !((message.identifier) & 0x1);
+
 
       Serial.print("Message received: ");
       Serial.print("Node ID: ");
       Serial.print(nodeID, HEX);
       Serial.print(" Message ID: ");
       Serial.print(messageID, HEX);
+      Serial.print(" Log Message?: ");
+      Serial.print(logMessage ? "yes " : "no ");
       Serial.print(" Data: ");
       Serial.println(data, HEX);
 
       //Call the onMessageReceived function in the device code
-      this->onMessageReceived(nodeID,messageID, data);
+      this->onMessageReceived(nodeID,messageID,logMessage, data);
     }
   }
 }

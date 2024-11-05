@@ -205,7 +205,7 @@ void mainUIDisplayTask(void *parameters);
 void sendWarningToQueue();
 
 //Function that is called when a CAN Bus message is received
-void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
+void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessage,uint64_t data) {
     Serial.println("Message received callback");
     Serial.println("Sending message to MQTT");
 
@@ -264,7 +264,12 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint64_t data) {
 
     //Log the message to the SD card
 
-    writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+    if(logMessage){
+      Serial.println("Logging message");
+      writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+    }else{
+      Serial.println("Not logging message");
+    }
 
     delay(10);
 
@@ -542,7 +547,7 @@ void setup() {
     // Connect and begin the current sensor
     if (! ina219.begin(&Wire1)) {
       Serial.println("Failed to find INA219 chip");
-      while (1) { delay(10); }
+      //while (1) { delay(10); }
     }
     // Custoum calibration values for the current sensor (ussing the 16V entry as template, 
     // it is actually setup for 24v. But not well. Further testing required)

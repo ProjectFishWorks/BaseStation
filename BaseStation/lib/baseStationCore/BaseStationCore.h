@@ -44,7 +44,7 @@ private:
     QueueHandle_t rx_queue;
 
     //Function to call when a message is received
-    std::function<void(uint8_t nodeID, uint16_t messageID, uint64_t data)> onMessageReceived;
+    std::function<void(uint8_t nodeID, uint16_t messageID, uint8_t logMessage,uint64_t data)> onMessageReceived;
 
 public:
     //TODO: Add a debug flag to print messages
@@ -57,7 +57,7 @@ public:
     twai_message_t create_message(uint16_t messageID, uint8_t nodeID , uint64_t *data);
 
     //Initialize the base station core
-    bool Init(std::function<void(uint8_t nodeID, uint16_t messageID, uint64_t data)> onMessageReceived, uint8_t nodeID);
+    bool Init(std::function<void(uint8_t nodeID, uint16_t messageID, uint8_t logMessage,uint64_t data)> onMessageReceived, uint8_t nodeID);
 
     //Send a message to the CAN bus
     void sendMessage(uint16_t messageID, uint64_t *data);
