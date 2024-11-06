@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x00
+#define baseStationID 0x02
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -308,6 +308,7 @@ void MQTTConnect() {
         File manifestFile = LittleFS.open(manifestFileName, FILE_READ);
         String manifestString = manifestFile.readString();
         manifestFile.close();
+
         String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
 
         //Send the manifest data to the MQTT broker
@@ -438,8 +439,6 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   }else if(type == "manifestIn"){
     Serial.println("Manifest message received");
 
-    //Send the requested history data to the MQTT broker, data is the number of hours to read
-
     if(LittleFS.exists(manifestFileName)) {
       Serial.println("Manifest file exists, replacing");
       LittleFS.remove(manifestFileName);
@@ -473,15 +472,7 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
     Serial.println("Sending manifest data to MQTT");
     String manifestTopic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
 
-    // Allocate the JSON document
-    JsonDocument manifestDoc;
-
-    // Parse the JSON object
-    DeserializationError error = deserializeJson(manifestDoc, payload);
-
-    Serial.println("Sending manifest data to MQTT:" + manifestDoc.as<String>());
-
-    mqttClient.publish(manifestTopic.c_str(), manifestDoc.as<String>().c_str(), true);
+    mqttClient.publish(manifestTopic.c_str(), doc.as<String>().c_str(), true);
 
   }
   else {
