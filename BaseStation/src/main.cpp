@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x02
+#define baseStationID 0x00
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -443,6 +443,7 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
       Serial.println("Manifest file exists, replacing");
       LittleFS.remove(manifestFileName);
       File manifestFile = LittleFS.open(manifestFileName, FILE_WRITE);
+      Serial.println(doc.as<String>());
       manifestFile.write(payload, length);
       manifestFile.close();
     }else
@@ -485,12 +486,12 @@ void annoyingBuzz() {
   if (digitalRead(1) == HIGH) {
   //for(int i = 0; i < 1; i++){
     digitalWrite(48, HIGH);
-    Serial.println("Bzzzzz");
+    //Serial.println("Bzzzzz");
     delay(50);
     digitalWrite(48, LOW);
     //delay(100);
   } else {
-    Serial.println("Buzzer is off");
+    //Serial.println("Buzzer is off");
   }
 }
 
@@ -553,7 +554,7 @@ void setup() {
     clock_prescale_set(clock_div_1);
     #endif
     pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
-    pixels.setBrightness(20); // Set BRIGHTNESS to about 1/23 (max = 255)
+    pixels.setBrightness(100); // Set BRIGHTNESS to about 1/23 (max = 255)
     pixels.clear(); // Set all pixel colors to 'off'
     for (int i=0; i<NUMPIXELS; i++){
       pixels.setPixelColor(i, pixels.Color(150, 150, 0));
@@ -590,8 +591,8 @@ void setup() {
     }
     Serial.println("LittleFS Mount Successful");
 
-    pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status neopixel to green
-    pixels.setPixelColor(1, pixels.Color(150, 150, 0)); //Turn on status neopixel to yellow
+    pixels.setPixelColor(0, pixels.Color(10, 0, 0)); //Turn on status neopixel to green
+    pixels.setPixelColor(1, pixels.Color(10, 10, 0)); //Turn on status neopixel to yellow
     pixels.show(); // Set status pixel to green
     delay(500);
 
@@ -679,11 +680,11 @@ void setup() {
     display.println(F("to enter BIOS."));
     display.display(); // Show initial text
     for (int i=0; i<4; i++) {
-      pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-      pixels.setPixelColor(1, pixels.Color(0, 0, 150));
+      pixels.setPixelColor(0, pixels.Color(10, 0, 0));
+      pixels.setPixelColor(1, pixels.Color(0, 0, 10));
       pixels.show();   // Send the updated pixel colors to the hardware.
       delay(250); // Pause before next pass through loop
-      pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+      pixels.setPixelColor(0, pixels.Color(10, 0, 0));
       pixels.setPixelColor(1, pixels.Color(0, 0, 0));
       pixels.show();   // Send the updated pixel colors to the hardware.
       delay(250); // Pause before next pass through loop
@@ -691,8 +692,8 @@ void setup() {
 
     //delay(2000);
     if (digitalRead(21) == LOW && digitalRead(47) == LOW) {
-      pixels.setPixelColor(0, pixels.Color(0, 0, 150)); //Turn status pixel to green
-      pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to blue
+      pixels.setPixelColor(0, pixels.Color(0, 0, 10)); //Turn status pixel to green
+      pixels.setPixelColor(1, pixels.Color(0, 0, 10)); //Turn status pixel to blue
       pixels.show(); // Set status pixel to red
       display.clearDisplay();
       display.setTextSize(1); // Draw 2X-scale text
@@ -723,8 +724,8 @@ void setup() {
       display.display();     
       wm.startConfigPortal("Fish Sense Setup");
     }
-    pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn status pixel to green
-    pixels.setPixelColor(1, pixels.Color(150, 150, 0)); //Turn status pixel to yellow
+    pixels.setPixelColor(0, pixels.Color(10, 0, 0)); //Turn status pixel to green
+    pixels.setPixelColor(1, pixels.Color(10, 10, 0)); //Turn status pixel to yellow
     pixels.show(); // Set status pixel to green
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
@@ -747,8 +748,8 @@ void setup() {
       Serial.println(WiFi.softAPIP());
       Serial.println(myWiFiManager->getConfigPortalSSID());
 
-      pixels.setPixelColor(0, pixels.Color(0, 0, 150)); //Turn status pixel to blue
-      pixels.setPixelColor(1, pixels.Color(0, 0, 150)); //Turn status pixel to blue
+      pixels.setPixelColor(0, pixels.Color(0, 0, 10)); //Turn status pixel to blue
+      pixels.setPixelColor(1, pixels.Color(0, 0, 10)); //Turn status pixel to blue
       pixels.show(); // Set status pixel to red
 
       display.clearDisplay();
@@ -852,13 +853,13 @@ void setup() {
     core = BaseStationCore();
     if(core.Init(receivedCANBUSMessage, 0x00)){
         Serial.println("Node Controller Core Started");
-        pixels.setPixelColor(0, pixels.Color(150, 0, 0)); //Turn on status pixel to green
-        pixels.setPixelColor(1, pixels.Color(150, 0, 0)); //Turn on status pixel to green
+        pixels.setPixelColor(0, pixels.Color(10, 0, 0)); //Turn on status pixel to green
+        pixels.setPixelColor(1, pixels.Color(10, 0, 0)); //Turn on status pixel to green
         pixels.show(); // Set status pixel to green
     } else {
         Serial.println("Node Controller Core Failed to Start");
-        pixels.setPixelColor(0, pixels.Color(0, 150, 0)); //Turn on status pixel to green
-        pixels.setPixelColor(1, pixels.Color(0, 150, 0)); //Turn on status pixel to green
+        pixels.setPixelColor(0, pixels.Color(0, 10, 0)); //Turn on status pixel to green
+        pixels.setPixelColor(1, pixels.Color(0, 10, 0)); //Turn on status pixel to green
         pixels.show(); // Set status pixel to green
     }
 
@@ -1272,14 +1273,14 @@ void neoPixelTask(void *parameters) {
           lightingLoop = millis();
           if (lightingLoopState == 0) {
             pixels.clear();
-            pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-            pixels.setPixelColor(1, pixels.Color(150, 150, 0));
+            pixels.setPixelColor(0, pixels.Color(10, 0, 0));
+            pixels.setPixelColor(1, pixels.Color(10, 10, 0));
             pixels.show();   // Send the updated pixel colors to the hardware.
             lightingLoopState = 1;
             delay(25); // Pause before next pass through loop
           } else {
             pixels.clear();
-            pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+            pixels.setPixelColor(0, pixels.Color(10, 0, 0));
             pixels.setPixelColor(1, pixels.Color(0, 0, 0));
             pixels.show();   // Send the updated pixel colors to the hardware.
             lightingLoopState = 0;
@@ -1289,8 +1290,8 @@ void neoPixelTask(void *parameters) {
         break;
       } else {
         pixels.clear();
-        pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-        pixels.setPixelColor(1, pixels.Color(150, 0, 0));
+        pixels.setPixelColor(0, pixels.Color(10, 0, 0));
+        pixels.setPixelColor(1, pixels.Color(10, 0, 0));
         pixels.show();   // Send the updated pixel colors to the hardware.
         delay(25);
         break;
@@ -1302,14 +1303,14 @@ void neoPixelTask(void *parameters) {
         lightingLoop = millis();
         if (lightingLoopState == 0) {
           pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-          pixels.setPixelColor(1, pixels.Color(0, 0, 150));
+          pixels.setPixelColor(0, pixels.Color(10, 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 10));
           pixels.show();   // Send the updated pixel colors to the hardware.
           lightingLoopState = 1;
           delay(25); // Pause before next pass through loop
         } else {
           pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+          pixels.setPixelColor(0, pixels.Color(10, 0, 0));
           pixels.setPixelColor(1, pixels.Color(0, 0, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
           lightingLoopState = 0;
@@ -1324,15 +1325,15 @@ void neoPixelTask(void *parameters) {
         lightingLoop = millis();
         if (lightingLoopState == 0) {
           pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(0, 150, 0));
-          pixels.setPixelColor(1, pixels.Color(0, 150, 0));
+          pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+          pixels.setPixelColor(1, pixels.Color(255, 255, 255));
           pixels.show();   // Send the updated pixel colors to the hardware.
           lightingLoopState = 1;
           delay(25);
         } else {
           pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(0, 0, 0));
-          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.setPixelColor(0, pixels.Color(255, 255, 255));
+          pixels.setPixelColor(1, pixels.Color(0, 255, 0));
           pixels.show();   // Send the updated pixel colors to the hardware.
           delay(25);
           lightingLoopState = 0;
@@ -1346,8 +1347,8 @@ void neoPixelTask(void *parameters) {
         lightingLoop = millis();
         if (lightingLoopState == 0) {
           pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(0, 150, 150));
-          pixels.setPixelColor(1, pixels.Color(0, 150, 150));
+          pixels.setPixelColor(0, pixels.Color(0, 10, 10));
+          pixels.setPixelColor(1, pixels.Color(0, 10, 10));
           pixels.show();   // Send the updated pixel colors to the hardware.
           lightingLoopState = 1;
           delay(25);
