@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x00
+#define baseStationID 0x01
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -82,21 +82,42 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
-#define LOGO_HEIGHT   48
+#define Fishy_HEIHT 16
+#define Fishy_WIDTH 32
+#define LOGO_HEIGHT   44
 #define LOGO_WIDTH    64
 bool screenSaverRunning;
 int LCD_SDA = 13;
 int LCD_SCL = 14;
+static const unsigned char PROGMEM fishy_bmp[] =
+/**
+ * Made with Marlin Bitmap Converter
+ * https://marlinfw.org/tools/u8glib/converter.html
+ */
+{
+  B11100000,B00000011,B11111000,B00000000,
+  B01111000,B00001110,B00001100,B00000000,
+  B01101100,B00011000,B00000011,B10000000,
+  B00100110,B00110000,B00000000,B11100000,
+  B00110011,B01100000,B00000000,B00111000,
+  B00010001,B11000000,B00000000,B00001100,
+  B00010000,B10000000,B01001000,B00000111,
+  B00010000,B10000000,B11011000,B00000001,
+  B00010000,B10000000,B10010000,B00000001,
+  B00010001,B11000001,B11100000,B00000010,
+  B00010011,B01000000,B00000000,B00000110,
+  B00010010,B01100000,B00000000,B00011100,
+  B00110110,B00111000,B00000000,B00110000,
+  B00101100,B00001000,B00000000,B11100000,
+  B01111000,B00001110,B00000011,B10000000,
+  B11100000,B00000011,B11111110,B00000000
+};
 static const unsigned char PROGMEM logo_bmp[] =
 /**
  * Made with Marlin Bitmap Converter
  * https://marlinfw.org/tools/u8glib/converter.html
- *
- * This bitmap from the file 'image1 (2).bmp'
  */
 {
-  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,
-  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,
   B00000000,B00000000,B00000000,B11111111,B11111100,B00000000,B00000000,B00000000,
   B00000000,B00000000,B00000111,B00000011,B00000011,B10000000,B00000000,B00000000,
   B00000000,B00000000,B00011000,B11110000,B01111100,B11100000,B00000000,B00000000,
@@ -140,9 +161,7 @@ static const unsigned char PROGMEM logo_bmp[] =
   B00000000,B00000011,B11111111,B00000000,B11111100,B00111100,B00111000,B00000000,
   B00000000,B00000111,B11111111,B11111111,B11111111,B11111111,B11111100,B00000000,
   B00000000,B00000110,B00000000,B00000000,B00000000,B00000000,B00000100,B00000000,
-  B00000000,B00011111,B11111111,B11111111,B11111111,B11111111,B11111111,B00000000,
-  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,
-  B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000,B00000000
+  B00000000,B00011111,B11111111,B11111111,B11111111,B11111111,B11111111,B00000000
 };
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -527,14 +546,23 @@ void setup() {
       Serial.println(F("SSD1306 allocation failed"));
       for(;;); // Don't proceed, loop forever
     }
-    display.clearDisplay();
-    display.drawBitmap(
-      (display.width()  - LOGO_WIDTH ) / 2,
-      (display.height() - LOGO_HEIGHT) / 2,
-      logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
-    display.display();
-    delay(1000);
+    display.setTextColor(SSD1306_WHITE);
+    // Draw a swimming fishey at the top of the screen
+    for(int i = -32; i < Fishy_WIDTH + SCREEN_WIDTH; i++){
+      display.clearDisplay();
+      display.drawBitmap(
+        (i),
+        (0),
+        fishy_bmp, Fishy_WIDTH, Fishy_HEIHT, 1);
+      display.drawBitmap(
+        (display.width()  - LOGO_WIDTH ) / 2,
+        ((display.height() / 4) + 2),
+        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+      display.display();
+      delay(10);
+    }
     Serial.println(F("Initialized LCD Screen"));
+    delay(10);
 
     // Connect and begin the current sensor
     if (! ina219.begin(&Wire1)) {
@@ -566,22 +594,42 @@ void setup() {
     // Initial Boot Dialog
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(10, 10);
-    display.println(F("Begining Boot..."));
-    display.setCursor(20, 30);
+    display.setCursor(1, 1);
+    //display.println(F("Begining Boot..."));
+    //display.setCursor(20, 30);
     display.println(F("Welcome to:"));
+    display.drawBitmap(
+      (display.width()  - LOGO_WIDTH ) / 2,
+      ((display.height() / 4) + 2),
+      logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
     display.display(); // Show initial text
     delay(1000);
     display.clearDisplay();
     display.setTextSize(2); // Draw 2X-scale text
-    display.setCursor(1, 10);
+    display.setCursor(1, 1);
     display.println(F("Fish Sense"));
-    display.setTextSize(1); // Draw 1X-scale text
-    display.setCursor(1, 30);
-    display.println(F("by Project FishWorks"));
+    //display.setTextSize(1); // Draw 1X-scale text
+    //display.setCursor(1, 30);
+    //display.println(F("by Project FishWorks"));
+    display.drawBitmap(
+      (display.width()  - LOGO_WIDTH ) / 2,
+      ((display.height() / 4) + 2),
+      logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
     display.display();      // Show initial text
-    delay(2000);
+    delay(1500);
+    display.clearDisplay();
+    display.setTextSize(1); // Draw 2X-scale text
+    display.setCursor(1, 1);
+    //display.println(F("Fish Sense"));
+    //display.setTextSize(1); // Draw 1X-scale text
+    //display.setCursor(1, 30);
+    display.println(F("by Project FishWorks"));
+    display.drawBitmap(
+      (display.width()  - LOGO_WIDTH ) / 2,
+      ((display.height() / 4) + 2),
+      logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
+    display.display();      // Show initial text
+    delay(1500);
 
     // Setup the SD Card and File System
     if (!LittleFS.begin(1)) {
@@ -594,7 +642,6 @@ void setup() {
     pixels.setPixelColor(0, pixels.Color(10, 0, 0)); //Turn on status neopixel to green
     pixels.setPixelColor(1, pixels.Color(10, 10, 0)); //Turn on status neopixel to yellow
     pixels.show(); // Set status pixel to green
-    delay(500);
 
     if(LittleFS.exists(mqttConfigFileName)) {
       Serial.println("MQTT Config file exists, loading");
@@ -674,9 +721,9 @@ void setup() {
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(10, 10);
+    display.setCursor(10, 17);
     display.println(F("Hold both buttons"));
-    display.setCursor(20, 30);
+    display.setCursor(20, 31);
     display.println(F("to enter BIOS."));
     display.display(); // Show initial text
     for (int i=0; i<4; i++) {
@@ -697,29 +744,32 @@ void setup() {
       pixels.show(); // Set status pixel to red
       display.clearDisplay();
       display.setTextSize(1); // Draw 2X-scale text
-      display.setTextColor(SSD1306_WHITE);
-      display.setCursor(10, 10);
+      display.setCursor(10, 1);
       display.println(F("Starting BIOS.."));
-      display.setCursor(20, 30);
+      display.setCursor(10, 37);
+      display.println(F("........"));
+      display.setCursor(20, 47);
+      display.println(F("........"));
+      display.setCursor(30, 57);
       display.println(F("........"));
       display.display(); // Show initial text
       delay(500);
       display.clearDisplay();
-      display.setTextSize(1); // Draw 2X-scale text
-      display.setTextColor(SSD1306_WHITE);
-      display.setCursor(5, 5);
-      display.println(F("To enter BIOS,"));
-      display.setCursor(5, 14);
+      display.setTextSize(2); // Draw 2X-scale text
+      display.setCursor(5, 1);
+      display.println(F("BIOS Mode"));
+      display.setTextSize(1); // Draw 1X-scale text
+      display.setCursor(5, 17);
       display.println(F("Please connect to:"));
-      display.setCursor(5, 23);
+      display.setCursor(5, 27);
       display.print(F("< "));
       display.print("Fish Sense Setup");
       display.println(F(" >"));
-      display.setCursor(5, 32);
+      display.setCursor(5, 37);
       display.println(F("and navigate to"));
-      display.setCursor(5, 41);
+      display.setCursor(5, 47);
       display.println(("the web page at"));
-      display.setCursor(5, 50);
+      display.setCursor(5, 57);
       display.println(F("http://10.10.1.1"));
       display.display();     
       wm.startConfigPortal("Fish Sense Setup");
@@ -729,11 +779,9 @@ void setup() {
     pixels.show(); // Set status pixel to green
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(10, 30);
+    display.setCursor(10, 31);
     display.println(F("Continuing Boot"));
     display.display(); // Show initial text
-    delay(500);
     // Automatically connect using saved credentials,
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
     // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
@@ -753,21 +801,21 @@ void setup() {
       pixels.show(); // Set status pixel to red
 
       display.clearDisplay();
-      display.setTextSize(1); // Draw 2X-scale text
-      display.setTextColor(SSD1306_WHITE);
-      display.setCursor(5, 5);
-      display.println(F("Didnt Connect Wifi!"));
-      display.setCursor(5, 14);
+      display.setTextSize(2); // Draw 2X-scale text
+      display.setCursor(5, 1);
+      display.println(F("No WiFi!"));
+      display.setTextSize(1); // Draw 1X-scale text
+      display.setCursor(5, 17);
       display.println(F("Please connect to:"));
-      display.setCursor(5, 23);
+      display.setCursor(5, 27);
       display.print(F("< "));
       display.print(myWiFiManager->getConfigPortalSSID());
       display.println(F(" >"));
-      display.setCursor(5, 32);
+      display.setCursor(5, 37);
       display.println(F("to enter your WiFi"));
-      display.setCursor(5, 41);
+      display.setCursor(5, 47);
       display.println(("at the web page: "));
-      display.setCursor(5, 50);
+      display.setCursor(5, 57);
       display.print(F("http://"));
       display.println(WiFi.softAPIP());
       display.display();      // Show initial text
@@ -868,18 +916,18 @@ void setup() {
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(10, 10);
+    display.setCursor(10, 17);
     display.println(F("Boot Successful"));
-    display.setCursor(20, 30);
+    display.setCursor(20, 31);
     display.println(F("System Online"));
     display.display(); // Show initial text
     delay(3000);
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(10, 10);
+    display.setCursor(10, 17);
     display.println(F("Entering Standby"));
-    display.setCursor(20, 30);
+    display.setCursor(20, 31);
     display.println(F("Good Night~~"));
     display.display(); // Show initial text
     delay(1000);
@@ -924,7 +972,7 @@ void loop() {
     emailClientLoop(email_recipient, email_recipient_name);
 
     //Go to screen saver after 5 seconds should no button be pressed
-    if (baseStationState == 1 || baseStationState == 2) {
+    if (baseStationState == 1) {
       if (millis() >= lastInput + 5000) {
         Serial.println("Screen Saver Timeout");
         baseStationState = 0;
@@ -1006,7 +1054,8 @@ void mainUIDisplayTask(void *parameters) {
           display.clearDisplay();
           display.drawBitmap(
           random(1, (display.width() - LOGO_WIDTH)),
-          random(1, (display.height() - LOGO_HEIGHT)),
+          //(display.height() / 4),
+          2,
           logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
           display.display();
           lastScreenSaver = millis();
@@ -1016,7 +1065,8 @@ void mainUIDisplayTask(void *parameters) {
           display.clearDisplay();
           display.drawBitmap(
           random(1, (display.width() - LOGO_WIDTH)),
-          random(1, (display.height() - LOGO_HEIGHT)),
+          //(display.height() / 4),
+          2,
           logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
           display.display();
           lastScreenSaver = millis();
@@ -1031,11 +1081,13 @@ void mainUIDisplayTask(void *parameters) {
             display.clearDisplay();
             display.setTextSize(2); // Draw 2X-scale text
             display.setTextColor(SSD1306_WHITE);
-            display.setCursor(10, 10);
+            display.setCursor(1, 1);
             display.print(F("Error "));
             display.println(i + 1);
             display.setTextSize(1); // Draw 1X-scale text
-            display.setCursor(20, 30);
+            display.setCursor(10, 17);
+            display.println(F("Silenced errors on"));
+            display.setCursor(20, 27);
             errorQueued = 1;
             String deviceName = "Node " + String(alertQueue[i].nodeID);
 
@@ -1074,6 +1126,10 @@ void mainUIDisplayTask(void *parameters) {
             }
 
             display.println(deviceName);
+            display.setCursor(20, 37);
+            display.println(F("Press MUTE to"));
+            display.setCursor(20, 47);
+            display.println(F("clear the error."));
             display.display(); // Show initial text
             while (alertQueue[i].isCleared == 0) {     
               delay(25);
@@ -1084,7 +1140,7 @@ void mainUIDisplayTask(void *parameters) {
                   break;
                 }
               }
-              if (baseStationState == 3) {
+              if (baseStationState == 0 || baseStationState == 1 || baseStationState == 3 ) {
                 break;
               }
               if (digitalRead(21) == LOW) {
@@ -1107,12 +1163,14 @@ void mainUIDisplayTask(void *parameters) {
             }
           }
           display.clearDisplay();
-          display.setTextSize(1); // Draw 2X-scale text
-          display.setTextColor(SSD1306_WHITE);
-          display.setCursor(10, 10);
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
           display.println(F("No Errors!"));
-          display.setCursor(10, 30);
-          display.println(F("Happy Fishes"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 27);
+          display.println(F("You've got some"));
+          display.setCursor(10, 41);
+          display.println(F("Happy Fishes."));
           display.display(); // Show initial text
           errorQueued = 0;
           delay(25);
@@ -1126,10 +1184,12 @@ void mainUIDisplayTask(void *parameters) {
         }
         display.clearDisplay();
         display.setTextSize(2); // Draw 2X-scale text
-        display.setCursor(1, 10);
-        display.println(F("Current is"));
+        display.setCursor(1, 1);
+        display.println(F("Current:"));
         display.setTextSize(1); // Draw 1X-scale text
-        display.setCursor(1, 30);
+        display.setCursor(10, 27);
+        display.println(F("You are using:"));
+        display.setCursor(16, 41);
         display.print(current_mA);
         display.print(" mA");
         display.display();      // Show initial text
@@ -1144,10 +1204,12 @@ void mainUIDisplayTask(void *parameters) {
             display.clearDisplay();
             display.setTextSize(2); // Draw 2X-scale text
             display.setTextColor(SSD1306_WHITE);
-            display.setCursor(10, 10);
+            display.setCursor(1, 1);
             display.println(F("!!Error:"));
             display.setTextSize(1); // Draw 1X-scale text
-            display.setCursor(20, 30);
+            display.setCursor(20, 17);
+            display.println(F("Error on node"));
+            display.setCursor(20, 27);
 
             String deviceName = "Node " + String(alertQueue[i].nodeID);
 
@@ -1187,6 +1249,10 @@ void mainUIDisplayTask(void *parameters) {
 
             display.println(deviceName);
             // display.println(alertQueue[i].nodeID);
+            display.setCursor(20, 37);
+            display.println(F("Press MUTE to "));
+            display.setCursor(20, 47);
+            display.println(F("silence the alert."));
             display.display(); // Show initial text
             delay(10);
             while (alertQueue[i].isSilenced == 0) {       
@@ -1219,9 +1285,9 @@ void mainUIDisplayTask(void *parameters) {
         display.clearDisplay();
         display.setTextSize(2); // Draw 2X-scale text
         display.setTextColor(SSD1306_WHITE);
-        display.setCursor(10, 10);
+        display.setCursor(10, 17);
         display.println(F("CANBus"));
-        display.setCursor(10, 30);
+        display.setCursor(10, 37);
         display.println(F("Offline"));
         display.display(); // Show initial text
         delay(25);
