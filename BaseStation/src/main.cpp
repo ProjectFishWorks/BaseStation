@@ -95,22 +95,22 @@ static const unsigned char PROGMEM fishy_bmp[] =
  * https://marlinfw.org/tools/u8glib/converter.html
  */
 {
-  B11100000,B00000011,B11111000,B00000000,
-  B01111000,B00001110,B00001100,B00000000,
-  B01101100,B00011000,B00000011,B10000000,
-  B00100110,B00110000,B00000000,B11100000,
-  B00110011,B01100000,B00000000,B00111000,
-  B00010001,B11000000,B00000000,B00001100,
-  B00010000,B10000000,B01001000,B00000111,
-  B00010000,B10000000,B11011000,B00000001,
-  B00010000,B10000000,B10010000,B00000001,
-  B00010001,B11000001,B11100000,B00000010,
-  B00010011,B01000000,B00000000,B00000110,
-  B00010010,B01100000,B00000000,B00011100,
-  B00110110,B00111000,B00000000,B00110000,
-  B00101100,B00001000,B00000000,B11100000,
-  B01111000,B00001110,B00000011,B10000000,
-  B11100000,B00000011,B11111110,B00000000
+  B00100000,B00000000,B00000000,B00111000,
+  B00000000,B00010000,B00000000,B00101000,
+  B00000000,B00001000,B00000000,B00111000,
+  B00000011,B00001100,B00000000,B00000000,
+  B00000001,B10011111,B00000001,B10000000,
+  B00111001,B10100000,B10000001,B10000000,
+  B00101001,B11000001,B01000000,B00000000,
+  B00111000,B10000000,B00100000,B00000000,
+  B00000001,B11000000,B01000000,B00000000,
+  B00000001,B10100000,B10000100,B00000000,
+  B00000001,B10011111,B00000000,B00000000,
+  B00000011,B00001100,B00000000,B00000000,
+  B01100000,B00001000,B00000000,B11110000,
+  B01100000,B00010000,B00000000,B10010000,
+  B00000000,B00000000,B10000000,B10010000,
+  B00000000,B00000000,B00000000,B11110000
 };
 static const unsigned char PROGMEM logo_bmp[] =
 /**
@@ -541,6 +541,19 @@ void setup() {
     Wire.begin(LCD_SDA, LCD_SCL);
     Wire1.begin(CUR_SDA, CUR_SCL);
     
+    // Connect and begin the NeoPixels
+    #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
+    clock_prescale_set(clock_div_1);
+    #endif
+    pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
+    pixels.setBrightness(255); // Set BRIGHTNESS to about 1/23 (max = 255)
+    pixels.clear(); // Set all pixel colors to 'off'
+    for (int i=0; i<NUMPIXELS; i++){
+      pixels.setPixelColor(i, pixels.Color(0, 0, 150));
+    }
+    pixels.show(); // Set all pixels to yellow
+    Serial.println(F("Initialized NeoPixel"));
+
     // Connect and beging the LCD Screen
     if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
       Serial.println(F("SSD1306 allocation failed"));
@@ -558,6 +571,8 @@ void setup() {
         (display.width()  - LOGO_WIDTH ) / 2,
         ((display.height() / 4) + 2),
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+      display.setCursor(57, 120);
+      display.println(baseStationID);
       display.display();
       delay(10);
     }
@@ -572,24 +587,6 @@ void setup() {
     // Custoum calibration values for the current sensor (ussing the 16V entry as template, 
     // it is actually setup for 24v. But not well. Further testing required)
     ina219.setCalibration_16V_400mA();
-
-
-
-
-
-    // Connect and begin the NeoPixels
-    #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
-    clock_prescale_set(clock_div_1);
-    #endif
-    pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
-    pixels.setBrightness(100); // Set BRIGHTNESS to about 1/23 (max = 255)
-    pixels.clear(); // Set all pixel colors to 'off'
-    for (int i=0; i<NUMPIXELS; i++){
-      pixels.setPixelColor(i, pixels.Color(150, 150, 0));
-    }
-    pixels.show(); // Set all pixels to yellow
-    Serial.println(F("Initialized NeoPixel"));
-
 
     // Initial Boot Dialog
     display.clearDisplay();
