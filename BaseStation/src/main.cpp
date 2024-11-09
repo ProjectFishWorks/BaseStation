@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x03
+#define baseStationID 0x00
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -531,6 +531,7 @@ void setup() {
     // Setup the onboard GPIO
     pinMode(0, INPUT_PULLUP);  //Program button with pullup
     pinMode(1, INPUT_PULLUP);  //Reset button with pullup
+    pinMode(2, INPUT_PULLUP);  //Fast boot toggle with pullup
     pinMode(21, INPUT_PULLUP); //ButtBlue
     pinMode(47, INPUT_PULLUP); //ButtWhite
     pinMode(48, OUTPUT); //Buzzer
@@ -560,7 +561,9 @@ void setup() {
       for(;;); // Don't proceed, loop forever
     }
     display.setTextColor(SSD1306_WHITE);
+
     // Draw a swimming fishey at the top of the screen
+    // if (digitalRead(2) == LOW) {
     for(int i = -32; i < Fishy_WIDTH + SCREEN_WIDTH; i++){
       display.clearDisplay();
       display.drawBitmap(
@@ -576,6 +579,7 @@ void setup() {
       display.display();
       delay(10);
     }
+    // }
     Serial.println(F("Initialized LCD Screen"));
     delay(10);
 
@@ -589,11 +593,10 @@ void setup() {
     ina219.setCalibration_16V_400mA();
 
     // Initial Boot Dialog
+    // if (digitalRead(2) == LOW) {
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setCursor(1, 1);
-    //display.println(F("Begining Boot..."));
-    //display.setCursor(20, 30);
     display.println(F("Welcome to:"));
     display.drawBitmap(
       (display.width()  - LOGO_WIDTH ) / 2,
@@ -601,25 +604,21 @@ void setup() {
       logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
     display.display(); // Show initial text
     delay(1000);
+
     display.clearDisplay();
     display.setTextSize(2); // Draw 2X-scale text
     display.setCursor(1, 1);
     display.println(F("Fish Sense"));
-    //display.setTextSize(1); // Draw 1X-scale text
-    //display.setCursor(1, 30);
-    //display.println(F("by Project FishWorks"));
     display.drawBitmap(
       (display.width()  - LOGO_WIDTH ) / 2,
       ((display.height() / 4) + 2),
       logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
     display.display();      // Show initial text
     delay(1500);
+
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setCursor(1, 1);
-    //display.println(F("Fish Sense"));
-    //display.setTextSize(1); // Draw 1X-scale text
-    //display.setCursor(1, 30);
     display.println(F("by Project FishWorks"));
     display.drawBitmap(
       (display.width()  - LOGO_WIDTH ) / 2,
@@ -627,6 +626,7 @@ void setup() {
       logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
     display.display();      // Show initial text
     delay(1500);
+    // }
 
     // Setup the SD Card and File System
     if (!LittleFS.begin(1)) {
@@ -715,6 +715,7 @@ void setup() {
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
     
+    // if (digitalRead(2) == LOW) {
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
@@ -734,7 +735,6 @@ void setup() {
       delay(250); // Pause before next pass through loop
     }
 
-    //delay(2000);
     if (digitalRead(21) == LOW && digitalRead(47) == LOW) {
       pixels.setPixelColor(0, pixels.Color(0, 0, 10)); //Turn status pixel to green
       pixels.setPixelColor(1, pixels.Color(0, 0, 10)); //Turn status pixel to blue
@@ -771,6 +771,7 @@ void setup() {
       display.display();     
       wm.startConfigPortal("Fish Sense Setup");
     }
+    // }
     pixels.setPixelColor(0, pixels.Color(10, 0, 0)); //Turn status pixel to green
     pixels.setPixelColor(1, pixels.Color(10, 10, 0)); //Turn status pixel to yellow
     pixels.show(); // Set status pixel to green
@@ -910,6 +911,7 @@ void setup() {
 
     digitalWrite(48, LOW); //Turn off the buzzer
 
+    // if (digitalRead(2) == LOW) {
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
@@ -928,6 +930,7 @@ void setup() {
     display.println(F("Good Night~~"));
     display.display(); // Show initial text
     delay(1000);
+    // }
 
     xTaskCreatePinnedToCore(
         mqttLoop,   /* Function to implement the task */
@@ -1137,41 +1140,44 @@ void mainUIDisplayTask(void *parameters) {
                   break;
                 }
               }
-              if (baseStationState == 0 || baseStationState == 3 ) {
+              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
                 break;
               }
               if (digitalRead(21) == LOW) {
-                alertQueue[i].isCleared = 1;
                 //latching debounce
                 while(digitalRead(21) == LOW){
                   delay(10);
                   }
+                  alertQueue[i].isCleared = 1;
                   lastInput = millis();
-                  break;
+                  //break;
                 }
-                if (digitalRead(47) == LOW) {
-                  while(digitalRead(47) == LOW) {
-                    delay(10);
-                    }
-                    lastInput = millis();
-                    break;
-                  }
+                // if (digitalRead(47) == LOW) {
+                //   while(digitalRead(47) == LOW) {
+                //     delay(10);
+                //     }
+                //     lastInput = millis();
+                //     break;
+                //   }
               }
-            }
+              break;
+            } else {
+            display.clearDisplay();
+            display.setTextSize(2); // Draw 2X-scale text
+            display.setCursor(1, 1);
+            display.println(F("No Errors!"));
+            display.setTextSize(1); // Draw 1X-scale text
+            display.setCursor(10, 27);
+            display.println(F("You've got some"));
+            display.setCursor(10, 41);
+            display.println(F("Happy Fishes."));
+            display.display(); // Show initial text
+            errorQueued = 0;
+            delay(25);
+            break;
           }
-          display.clearDisplay();
-          display.setTextSize(2); // Draw 2X-scale text
-          display.setCursor(1, 1);
-          display.println(F("No Errors!"));
-          display.setTextSize(1); // Draw 1X-scale text
-          display.setCursor(10, 27);
-          display.println(F("You've got some"));
-          display.setCursor(10, 41);
-          display.println(F("Happy Fishes."));
-          display.display(); // Show initial text
-          errorQueued = 0;
-          delay(25);
-          break;
+        }
+        break;
 
       case 2:
         //Current Sense Pagelong lastScreenSaver = millis();
@@ -1256,12 +1262,12 @@ void mainUIDisplayTask(void *parameters) {
               annoyingBuzz();
               delay(50);
               if (digitalRead(21) == LOW) {
-                  alertQueue[i].isSilenced = 1;
                   delay(25);
                 //latching debounce
                 while(digitalRead(21) == LOW){
                   delay(10);
                   }
+                  alertQueue[i].isSilenced = 1;
                   break;
                 }
               }
