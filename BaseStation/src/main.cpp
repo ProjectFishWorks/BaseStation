@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x03
+#define baseStationID 0x00
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -978,7 +978,7 @@ void loop() {
     //Go to screen saver after 5 seconds should no button be pressed
     if (baseStationState == 1) {
       if (millis() >= lastInput + 5000) {
-        Serial.println("Screen Saver Timeout");
+        // Serial.println("Screen Saver Timeout");
         baseStationState = 0;
       }
     }
@@ -1015,7 +1015,7 @@ void loop() {
       }
     }
     if (digitalRead(47) == LOW) {
-      Serial.println("Button 47 pressed");
+      // Serial.println("Button 47 pressed");
       screenSaverRunning = false;
       lastInput = millis();
       if (baseStationState == 3) {
@@ -1026,16 +1026,16 @@ void loop() {
           baseStationState ++;
           }
         }
-        Serial.println(baseStationState);
+        // Serial.println(baseStationState);
         //latching debounce
-        while(digitalRead(47) == LOW){
-          delay(10);
-          }
+      while(digitalRead(47) == LOW){
+        delay(10);
+        }
       }
-      for (int i = 0; i < 50; i++) {
-          if (alertQueue[i].isSilenced == 0) {
-            baseStationState = 3;
-          }
+    for (int i = 0; i < 50; i++) {
+      if (alertQueue[i].isSilenced == 0) {
+        baseStationState = 3;
+        }
       }
     delay(25);
     
@@ -1053,7 +1053,7 @@ void mainUIDisplayTask(void *parameters) {
       case 0:
         //Screen Saver
         if (screenSaverRunning == false) {
-          Serial.println("Starting Screen Saver");
+          // Serial.println("Starting Screen Saver");
           screenSaverRunning = true;
           display.clearDisplay();
           display.drawBitmap(
@@ -1065,7 +1065,7 @@ void mainUIDisplayTask(void *parameters) {
           lastScreenSaver = millis();
           }
         if (millis() > lastScreenSaver + 15000) {
-          Serial.println("Running Screen Saver");
+          // Serial.println("Running Screen Saver");
           display.clearDisplay();
           display.drawBitmap(
           random(1, (display.width() - LOGO_WIDTH)),
@@ -1096,7 +1096,7 @@ void mainUIDisplayTask(void *parameters) {
 
             //Send manifest data to the MQTT broker
             if(LittleFS.exists(manifestFileName)) {
-              Serial.println("Manifest file exists");
+              // Serial.println("Manifest file exists");
               File manifestFile = LittleFS.open(manifestFileName, FILE_READ);
               String manifestString = manifestFile.readString();
               manifestFile.close();
@@ -1135,11 +1135,11 @@ void mainUIDisplayTask(void *parameters) {
             display.println(F("clear the error."));
             display.display(); // Show initial text
             while (alertQueue[i].isCleared == 0) {   
-              Serial.println("latched an error");  
+              // Serial.println("latched an error");  
               delay(25);
               for (int e = 0; e < 50; e++) {
                 if (alertQueue[e].isSilenced == 0) {
-                  Serial.println("Move to Interupt Error Page");
+                  // Serial.println("Move to Interupt Error Page");
                   baseStationState = 3;
                   break;
                 }
@@ -1153,7 +1153,7 @@ void mainUIDisplayTask(void *parameters) {
                   delay(10);
                   }
                   alertQueue[i].isCleared = 1;
-                  Serial.println("changing error queued to 0");
+                  // Serial.println("changing error queued to 0");
                   errorQueued = 0;
                   lastInput = millis();
                   //break;
@@ -1169,7 +1169,7 @@ void mainUIDisplayTask(void *parameters) {
             }
         } // else {
         if (errorQueued == 0) {
-          Serial.println("no errors queued");
+          // Serial.println("no errors queued");
           display.clearDisplay();
           display.setTextSize(2); // Draw 2X-scale text
           display.setCursor(1, 1);
@@ -1209,7 +1209,7 @@ void mainUIDisplayTask(void *parameters) {
         for (int i = 0; i < 50; i++) {
           if (alertQueue[i].isSilenced == 0) {
             errorQueued = 1;
-            Serial.println("Interupt Error Page");
+            // Serial.println("Interupt Error Page");
             display.clearDisplay();
             display.setTextSize(2); // Draw 2X-scale text
             display.setTextColor(SSD1306_WHITE);
@@ -1280,7 +1280,7 @@ void mainUIDisplayTask(void *parameters) {
             }
             delay(25);
           }
-          Serial.println("Exiting Interupt Screen");
+          // Serial.println("Exiting Interupt Screen");
           baseStationState = 1;
           break;
 
