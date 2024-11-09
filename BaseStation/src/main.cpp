@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x01
+#define baseStationID 0x03
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -571,8 +571,8 @@ void setup() {
         (display.width()  - LOGO_WIDTH ) / 2,
         ((display.height() / 4) + 2),
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-      display.setCursor(57, 120);
-      display.println(baseStationID);
+      display.setCursor(120, 54);
+      display.print(baseStationID);
       display.display();
       delay(10);
     }
@@ -1123,9 +1123,9 @@ void mainUIDisplayTask(void *parameters) {
             }
 
             display.println(deviceName);
-            display.setCursor(20, 37);
+            display.setCursor(10, 37);
             display.println(F("Press MUTE to"));
-            display.setCursor(20, 47);
+            display.setCursor(10, 47);
             display.println(F("clear the error."));
             display.display(); // Show initial text
             while (alertQueue[i].isCleared == 0) {     
@@ -1137,7 +1137,7 @@ void mainUIDisplayTask(void *parameters) {
                   break;
                 }
               }
-              if (baseStationState == 0 || baseStationState == 1 || baseStationState == 3 ) {
+              if (baseStationState == 0 || baseStationState == 3 ) {
                 break;
               }
               if (digitalRead(21) == LOW) {
@@ -1204,9 +1204,9 @@ void mainUIDisplayTask(void *parameters) {
             display.setCursor(1, 1);
             display.println(F("!!Error:"));
             display.setTextSize(1); // Draw 1X-scale text
-            display.setCursor(20, 17);
+            display.setCursor(10, 17);
             display.println(F("Error on node"));
-            display.setCursor(20, 27);
+            display.setCursor(10, 27);
 
             String deviceName = "Node " + String(alertQueue[i].nodeID);
 
@@ -1246,9 +1246,9 @@ void mainUIDisplayTask(void *parameters) {
 
             display.println(deviceName);
             // display.println(alertQueue[i].nodeID);
-            display.setCursor(20, 37);
+            display.setCursor(10, 37);
             display.println(F("Press MUTE to "));
-            display.setCursor(20, 47);
+            display.setCursor(10, 47);
             display.println(F("silence the alert."));
             display.display(); // Show initial text
             delay(10);
@@ -1441,6 +1441,7 @@ void mqttLoop(void* _this){
     if (!mqttClient.connected()) {
         //digitalWrite(11, LOW);
         MQTTConnect();
+        delay(100);
     }
     mqttClient.loop();
     delay(10);
