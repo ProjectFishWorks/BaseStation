@@ -40,7 +40,7 @@
 
 //TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define systemID 0x00
-#define baseStationID 0x00
+#define baseStationID 0x03
 
 //TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -267,6 +267,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
             alertQueue[i].isSilenced = 0;
             alertQueue[i].isCleared = 0;
             baseStationState = 3;
+            errorQueued = 1;
             delay(10);
             break;
           }
@@ -562,8 +563,11 @@ void setup() {
     }
     display.setTextColor(SSD1306_WHITE);
 
+    // Start boot sequence, or skip if pin 2 pulled low.
+    if (digitalRead(2) == LOW) {
+      Serial.println("fast boot enabled - skipping useless stuff.");
+    } else {
     // Draw a swimming fishey at the top of the screen
-    // if (digitalRead(2) == LOW) {
     for(int i = -32; i < Fishy_WIDTH + SCREEN_WIDTH; i++){
       display.clearDisplay();
       display.drawBitmap(
@@ -579,7 +583,7 @@ void setup() {
       display.display();
       delay(10);
     }
-    // }
+    }
     Serial.println(F("Initialized LCD Screen"));
     delay(10);
 
@@ -593,7 +597,7 @@ void setup() {
     ina219.setCalibration_16V_400mA();
 
     // Initial Boot Dialog
-    // if (digitalRead(2) == LOW) {
+    if (digitalRead(2) == HIGH) {
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setCursor(1, 1);
@@ -626,7 +630,7 @@ void setup() {
       logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);  
     display.display();      // Show initial text
     delay(1500);
-    // }
+    }
 
     // Setup the SD Card and File System
     if (!LittleFS.begin(1)) {
@@ -715,7 +719,7 @@ void setup() {
     // reset settings - wipe stored credentials for testing
     // these are stored by the esp library
     
-    // if (digitalRead(2) == LOW) {
+    if (digitalRead(2) == HIGH) {
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
@@ -771,7 +775,7 @@ void setup() {
       display.display();     
       wm.startConfigPortal("Fish Sense Setup");
     }
-    // }
+    }
     pixels.setPixelColor(0, pixels.Color(10, 0, 0)); //Turn status pixel to green
     pixels.setPixelColor(1, pixels.Color(10, 10, 0)); //Turn status pixel to yellow
     pixels.show(); // Set status pixel to green
@@ -911,7 +915,7 @@ void setup() {
 
     digitalWrite(48, LOW); //Turn off the buzzer
 
-    // if (digitalRead(2) == LOW) {
+    if (digitalRead(2) == HIGH) {
     display.clearDisplay();
     display.setTextSize(1); // Draw 2X-scale text
     display.setTextColor(SSD1306_WHITE);
@@ -930,7 +934,7 @@ void setup() {
     display.println(F("Good Night~~"));
     display.display(); // Show initial text
     delay(1000);
-    // }
+    }
 
     xTaskCreatePinnedToCore(
         mqttLoop,   /* Function to implement the task */
@@ -1080,7 +1084,6 @@ void mainUIDisplayTask(void *parameters) {
           if (alertQueue[i].isCleared == 0) {
             display.clearDisplay();
             display.setTextSize(2); // Draw 2X-scale text
-            display.setTextColor(SSD1306_WHITE);
             display.setCursor(1, 1);
             display.print(F("Error "));
             display.println(i + 1);
@@ -1131,7 +1134,8 @@ void mainUIDisplayTask(void *parameters) {
             display.setCursor(10, 47);
             display.println(F("clear the error."));
             display.display(); // Show initial text
-            while (alertQueue[i].isCleared == 0) {     
+            while (alertQueue[i].isCleared == 0) {   
+              Serial.println("latched an error");  
               delay(25);
               for (int e = 0; e < 50; e++) {
                 if (alertQueue[e].isSilenced == 0) {
@@ -1149,6 +1153,8 @@ void mainUIDisplayTask(void *parameters) {
                   delay(10);
                   }
                   alertQueue[i].isCleared = 1;
+                  Serial.println("changing error queued to 0");
+                  errorQueued = 0;
                   lastInput = millis();
                   //break;
                 }
@@ -1160,24 +1166,23 @@ void mainUIDisplayTask(void *parameters) {
                 //     break;
                 //   }
               }
-              break;
-            } else {
-            display.clearDisplay();
-            display.setTextSize(2); // Draw 2X-scale text
-            display.setCursor(1, 1);
-            display.println(F("No Errors!"));
-            display.setTextSize(1); // Draw 1X-scale text
-            display.setCursor(10, 27);
-            display.println(F("You've got some"));
-            display.setCursor(10, 41);
-            display.println(F("Happy Fishes."));
-            display.display(); // Show initial text
-            errorQueued = 0;
-            delay(25);
-            break;
+            }
+        } // else {
+        if (errorQueued == 0) {
+          Serial.println("no errors queued");
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("No Errors!"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 27);
+          display.println(F("You've got some"));
+          display.setCursor(10, 41);
+          display.println(F("Happy Fishes."));
+          display.display(); // Show initial text
+          delay(25);
+          break;
           }
-        }
-        break;
 
       case 2:
         //Current Sense Pagelong lastScreenSaver = millis();
@@ -1203,6 +1208,7 @@ void mainUIDisplayTask(void *parameters) {
         //Error Warning Screen    
         for (int i = 0; i < 50; i++) {
           if (alertQueue[i].isSilenced == 0) {
+            errorQueued = 1;
             Serial.println("Interupt Error Page");
             display.clearDisplay();
             display.setTextSize(2); // Draw 2X-scale text
