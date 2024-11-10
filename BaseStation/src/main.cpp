@@ -317,6 +317,12 @@ void MQTTConnect() {
       String topicIn = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
       String topicHistory = "historyIn/" + String(systemID) + "/" + String(baseStationID) + "/#";
       String topicManifest = "manifestIn/" + String(systemID) + "/" + String(baseStationID);
+
+      Serial.println("starting delay for mqtt");
+      digitalWrite(11, HIGH);
+      delay(5000);
+      Serial.println("delay finished");
+
       mqttClient.subscribe(topicIn.c_str());
       mqttClient.subscribe(topicHistory.c_str());
       mqttClient.subscribe(topicManifest.c_str());
@@ -939,7 +945,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         mqttLoop,   /* Function to implement the task */
         "mqttLoop", /* Name of the task */
-        10000,      /* Stack size in words */
+        30000,      /* Stack size in words */
         NULL,       /* Task input parameter */
         1,          /* Priority of the task */
         &xMQTTloop,  /* Task handle. */
