@@ -973,7 +973,6 @@ void setup() {
         NULL,       /* Task handle. */
         1);         /* Core where the task should run */
 
-
     baseStationState = 0;
 }
 
@@ -1220,7 +1219,9 @@ void mainUIDisplayTask(void *parameters) {
             display.setTextSize(2); // Draw 2X-scale text
             display.setTextColor(SSD1306_WHITE);
             display.setCursor(1, 1);
-            display.println(F("!!Error:"));
+            display.print(F("!!Error "));
+            display.print(i + 1);
+            display.println(F("!!:"));
             display.setTextSize(1); // Draw 1X-scale text
             display.setCursor(10, 17);
             display.println(F("Error on node"));
