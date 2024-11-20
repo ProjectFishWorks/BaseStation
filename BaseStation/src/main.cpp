@@ -1060,13 +1060,14 @@ void mainUIDisplayTask(void *parameters) {
   long buttPress;
   int errorNumber;
   int state3screen = 0;
+  int onlyOnce = 0;
   while (1) {
     //switch case for the main UI display
     switch (baseStationState) {
 
       case 0:
         //Screen Saver
-        if (nightMode == 1) {
+        if (nightMode == 0) {
           if (screenSaverRunning == false) {
             // Serial.println("Starting Screen Saver");
             screenSaverRunning = true;
@@ -1237,6 +1238,7 @@ void mainUIDisplayTask(void *parameters) {
         break;
 
       case 3:
+        onlyOnce = 0;
         if (state3screen == 0) {
           display.clearDisplay();
           display.setTextSize(2); // Draw 2X-scale text
@@ -1255,7 +1257,7 @@ void mainUIDisplayTask(void *parameters) {
           display.setCursor(10, 57);
           display.println(F("options."));
           display.display(); // Show initial text
-            while (state3screen == 0 && baseStationState == 4) { 
+            while (state3screen == 0 && baseStationState == 3) { 
               delay(10);
               for (int e = 0; e < 50; e++) {
                 if (alertQueue[e].isSilenced == 0) {
@@ -1263,7 +1265,7 @@ void mainUIDisplayTask(void *parameters) {
                   break;
                 }
               }
-              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+              if (baseStationState != 3 ) {
                 break;
               }
               if (digitalRead(21) == LOW) {
@@ -1271,6 +1273,7 @@ void mainUIDisplayTask(void *parameters) {
                   delay(10);
                   }
                   state3screen = 1;
+                  Serial.println("State 3 Screen 1");
                   lastInput = millis();
                 }
               }
@@ -1296,21 +1299,27 @@ void mainUIDisplayTask(void *parameters) {
             delay(10);
             for (int e = 0; e < 50; e++) {
               if (alertQueue[e].isSilenced == 0) {
-                baseStationState = 3;
+                baseStationState = 4;
                 break;
               }
             }
-            if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+            if (baseStationState != 3) {
               break;
             }
             if (digitalRead(21) == LOW) {
               buttPress = millis();
               while(digitalRead(21) == LOW){
                 delay(10);
-                } 
+                if (millis() > buttPress + 3000) {
+                  if (onlyOnce == 0) {
+                    onlyOnce = 1;
+                    annoyingBuzz();
+                  }
+                }
                 if (millis() > buttPress + 3000) {
                   if (digitalRead(11) == HIGH) {
                     // The Action
+                    Serial.println("CANBus Toggled");
                     screenSaverRunning = false;
                     baseStationState = 5;
                     MQTTdisconnect();
@@ -1318,9 +1327,11 @@ void mainUIDisplayTask(void *parameters) {
                   }
                 } else {
                   state3screen = 2;
+                  Serial.println("State 3 Screen 2");
                   lastInput = millis();
                 }
-            }
+              }
+            } 
           }
         }
         if (state3screen == 2) {
@@ -1348,30 +1359,39 @@ void mainUIDisplayTask(void *parameters) {
                 break;
               }
             }
-            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+            if (baseStationState != 3 ) {
               break;
             }
             if (digitalRead(21) == LOW) {
               buttPress = millis();
               while(digitalRead(21) == LOW){
                 delay(10);
+                if (millis() > buttPress + 3000) {
+                  if (onlyOnce == 0) {
+                    onlyOnce = 1;
+                    annoyingBuzz();
+                  }
+                  }
               } 
               if (millis() > buttPress + 3000) {
                 if (digitalRead(11) == HIGH) {
                   // The Action
                   if (antiBuzzer == 0) {
                     antiBuzzer = 1;
+                    Serial.println("Buzzer Muted");
                   } else {
                     antiBuzzer = 0;
+                    Serial.println("Buzzer Unmuted");
                   }
-                } else {
-                  state3screen = 3;
-                  lastInput = millis();
                 }
-              }
+              } else {
+                  state3screen = 3;
+                  Serial.println("State 3 Screen 3");
+                  lastInput = millis();
             }
           }
         }
+      }
         if (state3screen == 3) {
           display.clearDisplay();
           display.setTextSize(2); // Draw 2X-scale text
@@ -1397,31 +1417,39 @@ void mainUIDisplayTask(void *parameters) {
                 break;
               }
             }
-            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+            if (baseStationState != 3) {
               break;
             }
             if (digitalRead(21) == LOW) {
               buttPress = millis();
+              Serial.println("Dark Mode Button Pressed");
               while(digitalRead(21) == LOW){
                 delay(10);
+                if (millis() > buttPress + 3000) {
+                  if (onlyOnce == 0) {
+                    onlyOnce = 1;
+                    annoyingBuzz();
+                  }
+                  }
               } 
               if (millis() > buttPress + 3000) {
-                if (digitalRead(11) == HIGH) {
                   // The Action
                   // Set the nightMode flag opposite of what it is
                   if (nightMode == 0) {
                     nightMode = 1;
+                    Serial.println("Night Mode On");
                   } else {
                     nightMode = 0;
+                    Serial.println("Night Mode Off");
                   }
                 } else {
                   state3screen = 4;
+                  Serial.println("State 3 Screen 4");
                   lastInput = millis();
                 }
               }
             }
           }
-        }
         if (state3screen == 4) {
           display.clearDisplay();
           display.setTextSize(2); // Draw 2X-scale text
@@ -1439,7 +1467,7 @@ void mainUIDisplayTask(void *parameters) {
           display.setCursor(10, 57);
           display.println(F("option."));
           display.display(); // Show initial text
-          while (state3screen == 3 && baseStationState == 3) {
+          while (state3screen == 4 && baseStationState == 3) {
             delay(10);
             for (int e = 0; e < 50; e++) {
               if (alertQueue[e].isSilenced == 0) {
@@ -1447,23 +1475,31 @@ void mainUIDisplayTask(void *parameters) {
                 break;
               }
             }
-            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+            if (baseStationState != 3) {
               break;
             }
             if (digitalRead(21) == LOW) {
               buttPress = millis();
               while(digitalRead(21) == LOW){
                 delay(10);
+                if (millis() > buttPress + 5000) {
+                  if (onlyOnce == 0) {
+                    onlyOnce = 1;
+                    annoyingBuzz();
+                  }
+                  }
               } 
               if (millis() > buttPress + 5000) {
-                if (digitalRead(11) == HIGH) {
                   // The Action
                   // Shut down the whole ESP32
+                  Serial.println("Restarting System");
+                  delay(1000);
                   ESP.restart();
 
-                }
+                
               } else {
                 state3screen = 0;
+                Serial.println("State 3 Screen 0");
                 lastInput = millis();
               }
             }
@@ -1556,13 +1592,14 @@ void mainUIDisplayTask(void *parameters) {
           break;
 
       case 5:
+        onlyOnce = 0;
         //CANBus OFF
         display.clearDisplay();
         display.setTextSize(2); // Draw 2X-scale text
         display.setTextColor(SSD1306_WHITE);
-        display.setCursor(10, 17);
+        display.setCursor(10, 1);
         display.println(F("CANBus"));
-        display.setCursor(10, 37);
+        display.setCursor(10, 17);
         display.println(F("Offline"));
         display.setTextSize(1); // Draw 1X-scale text
         display.setCursor(10, 47);
@@ -1574,13 +1611,18 @@ void mainUIDisplayTask(void *parameters) {
         while (baseStationState == 5) {
           delay(25);
           if (digitalRead(21) == LOW) {
-            long buttPress = millis();
+            buttPress = millis();
             while(digitalRead(21) == LOW){
               delay(10);
+                if (millis() > buttPress + 5000) {
+                  if (onlyOnce == 0) {
+                    onlyOnce = 1;
+                    annoyingBuzz();
+                  }
+                  }
               } 
               if (millis() > buttPress + 5000) {
-                if (digitalRead(11) == HIGH) {
-               
+                if (digitalRead(11) == LOW) {
                   Serial.println("CANBus On");
                   screenSaverRunning = false;
                   baseStationState = 0;    
