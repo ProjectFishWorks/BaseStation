@@ -1679,6 +1679,8 @@ void neoPixelTask(void *parameters) {
           pixels.show();
           delay(25);
         }
+      } else {
+        delay(25);
       }
       break;
 
@@ -1732,32 +1734,12 @@ void neoPixelTask(void *parameters) {
           lightingLoopState = 0;
           delay(25); // Pause before next pass through loop
         }
+      } else {
+        delay(25);
       }
       break;
 
     case 3:
-      //Warning Lighting
-      if (millis() >= lightingLoop + 1000) {
-        lightingLoop = millis();
-        if (lightingLoopState == 0) {
-          pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(0, 255, 0));
-          pixels.setPixelColor(1, pixels.Color(255, 255, 255));
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          lightingLoopState = 1;
-          delay(25);
-        } else {
-          pixels.clear();
-          pixels.setPixelColor(0, pixels.Color(255, 255, 255));
-          pixels.setPixelColor(1, pixels.Color(0, 255, 0));
-          pixels.show();   // Send the updated pixel colors to the hardware.
-          delay(25);
-          lightingLoopState = 0;
-        }
-      }
-      break;
-
-    case 4:
       //Settings Lighting
       if (millis() >= lightingLoop + 1500) {
         lightingLoop = millis();
@@ -1776,7 +1758,34 @@ void neoPixelTask(void *parameters) {
           lightingLoopState = 0;
           delay(25); // Pause before next pass through loop
         }
+      } else {
+        delay(25);
       }
+      break;
+
+    case 4:
+      //Warning Lighting
+      if (millis() >= lightingLoop + 1000) {
+        lightingLoop = millis();
+        if (lightingLoopState == 0) {
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+          pixels.setPixelColor(1, pixels.Color(255, 255, 255));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoopState = 1;
+          delay(25);
+        } else {
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(255, 255, 255));
+          pixels.setPixelColor(1, pixels.Color(0, 255, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          delay(25);
+          lightingLoopState = 0;
+        }
+      } else {
+        delay(25);
+      }
+      break;
 
 
     case 5:
@@ -1798,6 +1807,8 @@ void neoPixelTask(void *parameters) {
           delay(25);
           lightingLoopState = 0;
         }
+      } else {
+        delay(25);
       }
       break;
       
