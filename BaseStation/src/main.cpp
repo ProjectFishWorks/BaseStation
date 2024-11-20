@@ -1050,6 +1050,7 @@ void loop() {
 void mainUIDisplayTask(void *parameters) {
   long lastScreenSaver;
   long lastCurrentTest;
+  long buttPress;
   int errorNumber;
   int state3screen = 0;
   while (1) {
@@ -1248,7 +1249,6 @@ void mainUIDisplayTask(void *parameters) {
                   lastInput = millis();
                 }
               }
-          delay(25);   
         }
         if (state3screen == 1) {
           display.clearDisplay();
@@ -1258,7 +1258,6 @@ void mainUIDisplayTask(void *parameters) {
           display.setTextSize(1); // Draw 1X-scale text
           display.setCursor(10, 17);
           display.print(F("Toggle CANBus"));
-          display.println(baseStationID);
           display.setCursor(10, 27);
           display.print(F("Hold mute for 3"));
           display.setCursor(10, 37); 
@@ -1269,38 +1268,34 @@ void mainUIDisplayTask(void *parameters) {
           display.println(F("setting."));
           display.display(); // Show initial text
           while (state3screen == 1 && baseStationState == 3) {   
-              // Serial.println("latched an error");  
-              delay(10);
-              for (int e = 0; e < 50; e++) {
-                if (alertQueue[e].isSilenced == 0) {
-                  // Serial.println("Move to Interupt Error Page");
-                  baseStationState = 3;
-                  break;
-                }
-              }
-              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+            delay(10);
+            for (int e = 0; e < 50; e++) {
+              if (alertQueue[e].isSilenced == 0) {
+                baseStationState = 3;
                 break;
               }
-              if (digitalRead(21) == LOW) {
-                long buttPress = millis();
-                while(digitalRead(21) == LOW){
-                  delay(10);
-                  } 
-                  if (millis() > buttPress + 3000) {
-                      if (digitalRead(11) == HIGH) {
-                        // Serial.println("CANBus Off");
-                        screenSaverRunning = false;
-                        baseStationState = 5;
-                        MQTTdisconnect();
-                        digitalWrite(11, LOW);
-                        }
-                      } else {
-                        state3screen = 2;
-                        lastInput = millis();
-                        }
-                  //break;
+            }
+            if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+              break;
+            }
+            if (digitalRead(21) == LOW) {
+              buttPress = millis();
+              while(digitalRead(21) == LOW){
+                delay(10);
+                } 
+                if (millis() > buttPress + 3000) {
+                  if (digitalRead(11) == HIGH) {
+                    // The Action
+                    screenSaverRunning = false;
+                    baseStationState = 5;
+                    MQTTdisconnect();
+                    digitalWrite(11, LOW);
+                  }
+                } else {
+                  state3screen = 2;
+                  lastInput = millis();
                 }
-              }
+            }
         }
         if (state3screen == 2) {
           display.clearDisplay();
@@ -1309,8 +1304,50 @@ void mainUIDisplayTask(void *parameters) {
           display.println(F("Settings:"));
           display.setTextSize(1); // Draw 1X-scale text
           display.setCursor(10, 17);
+          display.print(F("Cauldren burn and"));
+          display.setCursor(10, 27);
+          display.print(F("cauldren bubble."));
+          display.setCursor(10, 47);
+          display.print(F("Tap MUTE for next"));
+          display.setCursor(10, 57);
+          display.println(F("option."));
+          display.display(); // Show initial text
+          while (state3screen == 2 && baseStationState == 3) {
+            delay(10);
+            for (int e = 0; e < 50; e++) {
+              if (alertQueue[e].isSilenced == 0) {
+                baseStationState = 4;
+                break;
+              }
+            }
+            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+              break;
+            }
+            if (digitalRead(21) == LOW) {
+              buttPress = millis();
+              while(digitalRead(21) == LOW){
+                delay(10);
+              } 
+              if (millis() > buttPress + 3000) {
+                if (digitalRead(11) == HIGH) {
+                  // The Action
+
+                }
+              } else {
+                state3screen = 2;
+                lastInput = millis();
+              }
+            }
+          }
+        }
+        if (state3screen == 3) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
           display.print(F("Something wicked this"));
-          display.println(baseStationID);
           display.setCursor(10, 27);
           display.print(F("way comes."));
           display.setCursor(10, 47);
@@ -1318,30 +1355,33 @@ void mainUIDisplayTask(void *parameters) {
           display.setCursor(10, 57);
           display.println(F("option."));
           display.display(); // Show initial text
-          while (state3screen == 2 && baseStationState == 3) {   
-              // Serial.println("latched an error");  
-              delay(10);
-              for (int e = 0; e < 50; e++) {
-                if (alertQueue[e].isSilenced == 0) {
-                  // Serial.println("Move to Interupt Error Page");
-                  baseStationState = 4;
-                  break;
-                }
-              }
-              if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+          while (state3screen == 2 && baseStationState == 3) {
+            delay(10);
+            for (int e = 0; e < 50; e++) {
+              if (alertQueue[e].isSilenced == 0) {
+                baseStationState = 4;
                 break;
               }
-              if (digitalRead(21) == LOW) {
-                //latching debounce
-                while(digitalRead(21) == LOW){
-                  delay(10);
-                  }
-                  state3screen = 0;
-                  lastInput = millis();
-                  //break;
+            }
+            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+              break;
+            }
+            if (digitalRead(21) == LOW) {
+              buttPress = millis();
+              while(digitalRead(21) == LOW){
+                delay(10);
+              } 
+              if (millis() > buttPress + 3000) {
+                if (digitalRead(11) == HIGH) {
+                  // The Action
+
                 }
+              } else {
+                state3screen = 2;
+                lastInput = millis();
               }
-        
+            }
+          }
         }
         //Base Station Utilities
         delay(25);
