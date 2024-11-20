@@ -266,7 +266,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
             alertQueue[i].isWarning = 0;
             alertQueue[i].isSilenced = 0;
             alertQueue[i].isCleared = 0;
-            baseStationState = 3;
+            baseStationState = 4;
             errorQueued = 1;
             delay(10);
             break;
@@ -1023,9 +1023,9 @@ void loop() {
       // Serial.println("Button 47 pressed");
       screenSaverRunning = false;
       lastInput = millis();
-      if (baseStationState == 3) {
+      if (baseStationState == 4) {
         } else {
-        if (baseStationState > 1) {
+        if (baseStationState > 2) {
           baseStationState = 0;
           } else {
           baseStationState ++;
@@ -1039,7 +1039,7 @@ void loop() {
       }
     for (int i = 0; i < 50; i++) {
       if (alertQueue[i].isSilenced == 0) {
-        baseStationState = 3;
+        baseStationState = 4;
         }
       }
     delay(25);
@@ -1051,6 +1051,7 @@ void mainUIDisplayTask(void *parameters) {
   long lastScreenSaver;
   long lastCurrentTest;
   int errorNumber;
+  int state3screen = 0;
   while (1) {
     //switch case for the main UI display
     switch (baseStationState) {
@@ -1145,11 +1146,11 @@ void mainUIDisplayTask(void *parameters) {
               for (int e = 0; e < 50; e++) {
                 if (alertQueue[e].isSilenced == 0) {
                   // Serial.println("Move to Interupt Error Page");
-                  baseStationState = 3;
+                  baseStationState = 4;
                   break;
                 }
               }
-              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 || baseStationState == 4) { 
                 break;
               }
               if (digitalRead(21) == LOW) {
@@ -1209,7 +1210,144 @@ void mainUIDisplayTask(void *parameters) {
         delay(25);
         break;
 
-      case 3:  
+      case 3:
+        if (state3screen == 0) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("Base Station ID:"));
+          display.println(baseStationID);
+          display.setCursor(10, 27);
+          display.print(F("Current WiFi:"));
+          display.setCursor(10, 37); 
+          display.println(WiFi.SSID());
+          display.setCursor(10, 47);
+          display.print(F("Hit MUTE for more"));
+          display.setCursor(10, 57);
+          display.println(F("options."));
+          display.display(); // Show initial text
+            while (state3screen == 0 && baseStationState == 4) { 
+              delay(10);
+              for (int e = 0; e < 50; e++) {
+                if (alertQueue[e].isSilenced == 0) {
+                  baseStationState = 3;
+                  break;
+                }
+              }
+              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+                break;
+              }
+              if (digitalRead(21) == LOW) {
+                while(digitalRead(21) == LOW){
+                  delay(10);
+                  }
+                  state3screen = 1;
+                  lastInput = millis();
+                }
+              }
+          delay(25);   
+        }
+        if (state3screen == 1) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("Toggle CANBus"));
+          display.println(baseStationID);
+          display.setCursor(10, 27);
+          display.print(F("Hold mute for 3"));
+          display.setCursor(10, 37); 
+          display.println(F("seconds to toggle."));
+          display.setCursor(10, 47);
+          display.print(F("Tap MUTE for next"));
+          display.setCursor(10, 57);
+          display.println(F("setting."));
+          display.display(); // Show initial text
+          while (state3screen == 1 && baseStationState == 3) {   
+              // Serial.println("latched an error");  
+              delay(10);
+              for (int e = 0; e < 50; e++) {
+                if (alertQueue[e].isSilenced == 0) {
+                  // Serial.println("Move to Interupt Error Page");
+                  baseStationState = 3;
+                  break;
+                }
+              }
+              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+                break;
+              }
+              if (digitalRead(21) == LOW) {
+                long buttPress = millis();
+                while(digitalRead(21) == LOW){
+                  delay(10);
+                  } 
+                  if (millis() > buttPress + 3000) {
+                      if (digitalRead(11) == HIGH) {
+                        // Serial.println("CANBus Off");
+                        screenSaverRunning = false;
+                        baseStationState = 5;
+                        MQTTdisconnect();
+                        digitalWrite(11, LOW);
+                        }
+                      } else {
+                        state3screen = 2;
+                        lastInput = millis();
+                        }
+                  //break;
+                }
+              }
+        }
+        if (state3screen == 2) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("Something wicked this"));
+          display.println(baseStationID);
+          display.setCursor(10, 27);
+          display.print(F("way comes."));
+          display.setCursor(10, 47);
+          display.print(F("Tap MUTE for next"));
+          display.setCursor(10, 57);
+          display.println(F("option."));
+          display.display(); // Show initial text
+          while (state3screen == 2 && baseStationState == 3) {   
+              // Serial.println("latched an error");  
+              delay(10);
+              for (int e = 0; e < 50; e++) {
+                if (alertQueue[e].isSilenced == 0) {
+                  // Serial.println("Move to Interupt Error Page");
+                  baseStationState = 4;
+                  break;
+                }
+              }
+              if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+                break;
+              }
+              if (digitalRead(21) == LOW) {
+                //latching debounce
+                while(digitalRead(21) == LOW){
+                  delay(10);
+                  }
+                  state3screen = 0;
+                  lastInput = millis();
+                  //break;
+                }
+              }
+        
+        }
+        //Base Station Utilities
+        delay(25);
+        break;
+
+      case 4:  
         //Error Warning Screen    
         for (int i = 0; i < 50; i++) {
           if (alertQueue[i].isSilenced == 0) {
@@ -1291,11 +1429,6 @@ void mainUIDisplayTask(void *parameters) {
           baseStationState = 1;
           break;
 
-      case 4:
-        //Base Station Utilities
-        delay(25);
-        break;
-
       case 5:
         //CANBus OFF
         display.clearDisplay();
@@ -1305,8 +1438,39 @@ void mainUIDisplayTask(void *parameters) {
         display.println(F("CANBus"));
         display.setCursor(10, 37);
         display.println(F("Offline"));
+        display.setTextSize(1); // Draw 1X-scale text
+        display.setCursor(10, 47);
+        display.println(F("Hold MUTE to"));
+        display.setCursor(10, 57);
+        display.println(F("reconnect."));
         display.display(); // Show initial text
         delay(25);
+        while (baseStationState == 5) {
+          delay(25);
+          if (digitalRead(21) == LOW) {
+            long buttPress = millis();
+            while(digitalRead(21) == LOW){
+              delay(10);
+              } 
+              if (millis() > buttPress + 5000) {
+                if (digitalRead(11) == HIGH) {
+               
+                  Serial.println("CANBus On");
+                  screenSaverRunning = false;
+                  baseStationState = 0;    
+                  xTaskCreatePinnedToCore(
+                    mqttLoop,   /* Function to implement the task */
+                    "mqttLoop", /* Name of the task */
+                    10000,      /* Stack size in words */
+                    NULL,       /* Task input parameter */
+                    1,          /* Priority of the task */
+                    &xMQTTloop,  /* Task handle. */
+                    0);         /* Core where the task should run */
+                  }
+                }
+                lastInput = millis();
+            }
+          }
         break;
 
       default:
@@ -1422,6 +1586,28 @@ void neoPixelTask(void *parameters) {
         }
       }
       break;
+
+    case 4:
+      //Settings Lighting
+      if (millis() >= lightingLoop + 1500) {
+        lightingLoop = millis();
+        if (lightingLoopState == 0) {
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(10, 0, 0));
+          pixels.setPixelColor(1, pixels.Color(10, 0, 10));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoopState = 1;
+          delay(25); // Pause before next pass through loop
+        } else {
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(10, 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoopState = 0;
+          delay(25); // Pause before next pass through loop
+        }
+      }
+
 
     case 5:
       //CANBus OFF
