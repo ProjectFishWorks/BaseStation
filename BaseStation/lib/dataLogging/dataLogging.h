@@ -45,6 +45,6 @@ void writeLogHeader(File *file, uint16_t systemID, uint16_t baseStationID, uint1
 String getLogDataRow(uint8_t nodeID, uint16_t messageID, uint64_t data);
 
 //Open the log file for writing, creating a new log file if needed
-void openLogFile(File *file, uint16_t systemID, uint16_t baseStationID, uint16_t messageID, String baseStationFirmwareVersion);
+void openLogFile(File *file, char* filename, uint16_t systemID, uint16_t baseStationID, uint16_t messageID, String baseStationFirmwareVersion, tm timeinfo);
 
 #endif
