@@ -320,7 +320,7 @@ void MQTTConnect() {
 
       Serial.println("starting delay for mqtt");
       digitalWrite(11, HIGH);
-      delay(5000);
+      delay(8000);
       Serial.println("delay finished");
 
       mqttClient.subscribe(topicIn.c_str());
@@ -417,10 +417,9 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   if(error) {
     Serial.print(F("deserializeJson() failed: "));
     Serial.println(error.c_str());
-    return;
-  }
-
-  //Don't use doc["data"].as<uint64_t>() because it will cause a zero to be sent over the CAN bus
+    Serial.println((char*)payload);
+  }else{
+    //Don't use doc["data"].as<uint64_t>() because it will cause a zero to be sent over the CAN bus
   //TODO fix this global variable hack
   uint64_t data = doc["data"];
   Serial.print("Data: ");
@@ -505,6 +504,10 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
   else {
     Serial.println("Unknown message type");
   }
+  }
+
+  
+  delay(100);
 
 }
 
