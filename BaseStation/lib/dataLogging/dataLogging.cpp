@@ -4,6 +4,7 @@
 void initSDCard() {
     //Mount the SD Card
     SPI.begin(sd_sck, sd_miso, sd_mosi, sd_cs);
+    SPI.setFrequency(40000000);
     if (!SD.begin(sd_cs)) {
         Serial.println("Card Mount Failed");
     }else{
@@ -37,17 +38,33 @@ void initSDCard() {
 
 //Write log data to the SD card, creating a new log file if needed
 void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationFirmwareVersion, uint8_t nodeID, uint16_t messageID, uint64_t data) {
+  
+  uint64_t start;
+  start = millis();
   //Create the log data row
   String logData = getLogDataRow(nodeID, messageID, data);
   File logFile;
   char filename[255];
-  getCurrentLogFilename(filename, systemID, baseStationID,messageID);
+
+  //Time object
+  struct tm timeinfo;
+  //If we can't get the current time, add a default filename
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time!");
+    strcpy(filename, "log-no-time.csv");
+  }else{
+    //Get the filename for the log file
+    getLogFilename(filename, systemID, baseStationID, messageID, timeinfo);
+  }
   // //TODO: For when we get the log file queue working, for now just write directly to the file
   // //xQueueSend(log_file_queue, &logData, portMAX_DELAY);
-  openLogFile(&logFile, systemID, baseStationID, messageID, String(baseStationFirmwareVersion));
+  openLogFile(&logFile,filename ,systemID, baseStationID, messageID, String(baseStationFirmwareVersion), timeinfo);
   logFile.println(logData);
   // Serial.println("Wrote to log file : " + logData);
   logFile.close();
+
+  Serial.println("Time to write log data: " + String(millis() - start) + "ms");
+
 }
 
 //Send log data to the MQTT broker
@@ -193,11 +210,14 @@ void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, u
 
   //Buffer to hold the current date/time
   char timeString[255];
+  char dirString[20];
   //Format the data/time
   strftime(timeString, 255, "-%Y-%m-%d-%H.csv", &timeinfo);
+  
+  strftime(dirString, 20, "/%Y/%m/%d/%H", &timeinfo);
 
   //Combine the date/time with system and base station ID
-  String filenameString = "/log-" + String(systemID) + "-" + String(baseStationID) + "-" + String(messageID) + timeString;
+  String filenameString = String(dirString) + "/log-" + String(systemID) + "-" + String(baseStationID) + "-" + String(messageID) + timeString;
 
   //Copy the final string to the filename pointer
   filenameString.toCharArray(filename, filenameString.length() + 1);
@@ -206,16 +226,6 @@ void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, u
 //Get the current log file name based on the current time
 //Currently creates one log file per hour
 void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, uint16_t messageID) {
-  //Time object
-  struct tm timeinfo;
-  //If we can't get the current time, add a default filename
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time!");
-    strcpy(filename, "log-no-time.csv");
-    return;
-  }
-
-  getLogFilename(filename, systemID, baseStationID, messageID, timeinfo);
   
 }
 
@@ -240,10 +250,37 @@ String getLogDataRow(uint8_t nodeID, uint16_t messageID, uint64_t data) {
 }
 
 //Open the log file and creates a new one if it doesn't exist
-void openLogFile(File *file, uint16_t systemID, uint16_t baseStationID, uint16_t messageID, String baseStationFirmwareVersion) {
+void openLogFile(File *file, char* filename, uint16_t systemID, uint16_t baseStationID, uint16_t messageID, String baseStationFirmwareVersion, tm timeinfo) {
   //Get the current filename based on the current time
-  char filename[255];
   getCurrentLogFilename(filename, systemID, baseStationID, messageID);
+
+  char dir[25];
+
+  //mkdir() does not work with the full path, so we need to create each directory in the path individually
+  //Arduino doc says that mkdir() will create all directories in the path, but it does not work
+  //Likly related to the ESP32 implementation
+  strftime(dir, 25, "/%Y/%m/%d/%H", &timeinfo);
+  if(!SD.exists(dir)){
+    strftime(dir, 25, "/%Y", &timeinfo);
+    if(!SD.exists(dir)){
+      SD.mkdir(dir);
+    }
+
+    strftime(dir, 25, "/%Y/%m", &timeinfo);
+    if(!SD.exists(dir)){
+      SD.mkdir(dir);
+    }
+
+    strftime(dir, 25, "/%Y/%m/%d", &timeinfo);
+    if(!SD.exists(dir)){
+      SD.mkdir(dir);
+    }
+
+    strftime(dir, 25, "/%Y/%m/%d/%H", &timeinfo);
+    if(!SD.exists(dir)){
+      SD.mkdir(dir);
+    }
+  }
 
   //If the file exists, open it in append mode, otherwise create a new file
   if(SD.exists(filename)) {
