@@ -76,6 +76,7 @@ int antiBuzzer = 0;
 #define NUMPIXELS   2 // Popular NeoPixel ring size
 #define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
 int errorQueued = 0; //Flag to indicate if an error has been queued for the NeoPixel
+int nightMode = 0; //Flag to indicate if night mode is enabled
 
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 
@@ -1062,29 +1063,47 @@ void mainUIDisplayTask(void *parameters) {
 
       case 0:
         //Screen Saver
-        if (screenSaverRunning == false) {
-          // Serial.println("Starting Screen Saver");
-          screenSaverRunning = true;
-          display.clearDisplay();
-          display.drawBitmap(
-          random(1, (display.width() - LOGO_WIDTH)),
-          //(display.height() / 4),
-          2,
-          logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-          display.display();
-          lastScreenSaver = millis();
-          }
-        if (millis() > lastScreenSaver + 15000) {
-          // Serial.println("Running Screen Saver");
-          display.clearDisplay();
-          display.drawBitmap(
-          random(1, (display.width() - LOGO_WIDTH)),
-          //(display.height() / 4),
-          2,
-          logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-          display.display();
-          lastScreenSaver = millis();
-          }
+        if (nightMode == 1) {
+          if (screenSaverRunning == false) {
+            // Serial.println("Starting Screen Saver");
+            screenSaverRunning = true;
+            display.clearDisplay();
+            display.drawBitmap(
+              random(1, (display.width() - LOGO_WIDTH)),
+              //(display.height() / 4),
+              2,
+              logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+            display.display();
+            lastScreenSaver = millis();
+            }
+          if (millis() > lastScreenSaver + 15000) {
+            // Serial.println("Running Screen Saver");
+            display.clearDisplay();
+            display.drawBitmap(
+              random(1, (display.width() - LOGO_WIDTH)),
+              //(display.height() / 4),
+              2,
+              logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+            display.display();
+            lastScreenSaver = millis();
+            }
+        } else {
+          if (screenSaverRunning == false) {
+            screenSaverRunning = true;
+            display.clearDisplay();
+            display.drawBitmap(
+              (display.width()  - LOGO_WIDTH ) / 2,
+              ((display.height() / 4) + 2),
+              logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+            display.display();
+            lastScreenSaver = millis();
+            }
+          if (millis() > lastScreenSaver + 5000) {
+            display.clearDisplay();
+            display.display();
+            lastScreenSaver = millis();
+            }
+        }
         delay(25);
         break;
 
@@ -1299,6 +1318,7 @@ void mainUIDisplayTask(void *parameters) {
                   lastInput = millis();
                 }
             }
+          }
         }
         if (state3screen == 2) {
           display.clearDisplay();
@@ -1342,13 +1362,64 @@ void mainUIDisplayTask(void *parameters) {
                     antiBuzzer = 0;
                   }
                 } else {
-                  state3screen = 2;
+                  state3screen = 3;
                   lastInput = millis();
+                }
               }
             }
           }
         }
         if (state3screen == 3) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("Dark Mode"));
+          display.setCursor(10, 27);
+          display.print(F("Hold MUTE for 3"));
+          display.setCursor(10, 37);
+          display.print(F("seconds to toggle."));
+          display.setCursor(10, 47);
+          display.print(F("Tap MUTE for next"));
+          display.setCursor(10, 57);
+          display.println(F("option."));
+          display.display(); // Show initial text
+          while (state3screen == 3 && baseStationState == 3) {
+            delay(10);
+            for (int e = 0; e < 50; e++) {
+              if (alertQueue[e].isSilenced == 0) {
+                baseStationState = 4;
+                break;
+              }
+            }
+            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+              break;
+            }
+            if (digitalRead(21) == LOW) {
+              buttPress = millis();
+              while(digitalRead(21) == LOW){
+                delay(10);
+              } 
+              if (millis() > buttPress + 5000) {
+                if (digitalRead(11) == HIGH) {
+                  // The Action
+                  // Set the nightMode flag opposite of what it is
+                  if (nightMode == 0) {
+                    nightMode = 1;
+                  } else {
+                    nightMode = 0;
+                  }
+                } else {
+                  state3screen = 4;
+                  lastInput = millis();
+                }
+              }
+            }
+          }
+        }
+        if (state3screen == 4) {
           display.clearDisplay();
           display.setTextSize(2); // Draw 2X-scale text
           display.setCursor(1, 1);
@@ -1388,7 +1459,7 @@ void mainUIDisplayTask(void *parameters) {
 
                 }
               } else {
-                state3screen = 2;
+                state3screen = 0;
                 lastInput = millis();
               }
             }
@@ -1541,25 +1612,27 @@ void neoPixelTask(void *parameters) {
     {
     case 0:
       //Screen Saver breathing
-      for (int i = 0; i < 150; i++) {
-        if (baseStationState != 0) {
-          break;
+      if (nightMode == 0) {
+        for (int i = 0; i < 150; i++) {
+          if (baseStationState != 0) {
+            break;
+          }
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.show();
+          delay(25);
         }
-        pixels.clear();
-        pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
-        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-        pixels.show();
-        delay(25);
-      }
-      for (int i = 0; i < 150; i++) {
-        if (baseStationState != 0) {
-          break;
+        for (int i = 0; i < 150; i++) {
+          if (baseStationState != 0) {
+            break;
+          }
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.show();
+          delay(25);
         }
-        pixels.clear();
-        pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
-        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-        pixels.show();
-        delay(25);
       }
       break;
 
