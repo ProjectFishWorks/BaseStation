@@ -68,6 +68,9 @@ bool shouldSaveConfig = false;
 //Screen Savers
 long lastInput;
 
+//Buzzer Control
+int antiBuzzer = 0;
+
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
 #define NUMPIXELS   2 // Popular NeoPixel ring size
@@ -509,7 +512,7 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 }
 
 void annoyingBuzz() {
-  if (digitalRead(1) == HIGH) {
+  if (digitalRead(1) == HIGH && antiBuzzer == 0) {
   //for(int i = 0; i < 1; i++){
     digitalWrite(48, HIGH);
     //Serial.println("Bzzzzz");
@@ -1304,9 +1307,11 @@ void mainUIDisplayTask(void *parameters) {
           display.println(F("Settings:"));
           display.setTextSize(1); // Draw 1X-scale text
           display.setCursor(10, 17);
-          display.print(F("Cauldren burn and"));
+          display.print(F("Buzzer Mute"));
           display.setCursor(10, 27);
-          display.print(F("cauldren bubble."));
+          display.print(F("hold MUTE 3 seconds"));
+          display.setCursor(10, 37);
+          display.print(F("to toggle."));
           display.setCursor(10, 47);
           display.print(F("Tap MUTE for next"));
           display.setCursor(10, 57);
@@ -1331,11 +1336,14 @@ void mainUIDisplayTask(void *parameters) {
               if (millis() > buttPress + 3000) {
                 if (digitalRead(11) == HIGH) {
                   // The Action
-
-                }
-              } else {
-                state3screen = 2;
-                lastInput = millis();
+                  if (antiBuzzer == 0) {
+                    antiBuzzer = 1;
+                  } else {
+                    antiBuzzer = 0;
+                  }
+                } else {
+                  state3screen = 2;
+                  lastInput = millis();
               }
             }
           }
@@ -1347,15 +1355,17 @@ void mainUIDisplayTask(void *parameters) {
           display.println(F("Settings:"));
           display.setTextSize(1); // Draw 1X-scale text
           display.setCursor(10, 17);
-          display.print(F("Something wicked this"));
+          display.print(F("This will eventually"));
           display.setCursor(10, 27);
-          display.print(F("way comes."));
+          display.print(F("restart the whole"));
+          display.setCursor(10, 37);
+          display.print(F("system.(no shutdown)"));
           display.setCursor(10, 47);
           display.print(F("Tap MUTE for next"));
           display.setCursor(10, 57);
           display.println(F("option."));
           display.display(); // Show initial text
-          while (state3screen == 2 && baseStationState == 3) {
+          while (state3screen == 3 && baseStationState == 3) {
             delay(10);
             for (int e = 0; e < 50; e++) {
               if (alertQueue[e].isSilenced == 0) {
@@ -1371,9 +1381,10 @@ void mainUIDisplayTask(void *parameters) {
               while(digitalRead(21) == LOW){
                 delay(10);
               } 
-              if (millis() > buttPress + 3000) {
+              if (millis() > buttPress + 5000) {
                 if (digitalRead(11) == HIGH) {
                   // The Action
+                  // Shut down the whole ESP32
 
                 }
               } else {
