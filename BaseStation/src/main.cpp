@@ -986,7 +986,7 @@ void loop() {
 
     //Go to screen saver after 5 seconds should no button be pressed
     if (baseStationState == 1) {
-      if (millis() >= lastInput + 5000) {
+      if (millis() >= lastInput + 7000) {
         // Serial.println("Screen Saver Timeout");
         baseStationState = 0;
       }
@@ -1402,7 +1402,7 @@ void mainUIDisplayTask(void *parameters) {
               while(digitalRead(21) == LOW){
                 delay(10);
               } 
-              if (millis() > buttPress + 5000) {
+              if (millis() > buttPress + 3000) {
                 if (digitalRead(11) == HIGH) {
                   // The Action
                   // Set the nightMode flag opposite of what it is
@@ -1426,11 +1426,11 @@ void mainUIDisplayTask(void *parameters) {
           display.println(F("Settings:"));
           display.setTextSize(1); // Draw 1X-scale text
           display.setCursor(10, 17);
-          display.print(F("This will eventually"));
+          display.print(F("RESTART SYSTEM"));
           display.setCursor(10, 27);
-          display.print(F("restart the whole"));
+          display.print(F("Hold MUTE for 5"));
           display.setCursor(10, 37);
-          display.print(F("system.(no shutdown)"));
+          display.print(F("seconds to restart."));
           display.setCursor(10, 47);
           display.print(F("Tap MUTE for next"));
           display.setCursor(10, 57);
@@ -1456,6 +1456,7 @@ void mainUIDisplayTask(void *parameters) {
                 if (digitalRead(11) == HIGH) {
                   // The Action
                   // Shut down the whole ESP32
+                  ESP.restart();
 
                 }
               } else {
@@ -1481,7 +1482,7 @@ void mainUIDisplayTask(void *parameters) {
             display.setCursor(1, 1);
             display.print(F("!!Error "));
             display.print(i + 1);
-            display.println(F("!!:"));
+            display.println(F(":"));
             display.setTextSize(1); // Draw 1X-scale text
             display.setCursor(10, 17);
             display.println(F("Error on node"));
