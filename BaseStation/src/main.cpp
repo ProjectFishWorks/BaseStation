@@ -68,11 +68,15 @@ bool shouldSaveConfig = false;
 //Screen Savers
 long lastInput;
 
+//Buzzer Control
+int antiBuzzer = 0;
+
 //NeoPixel Setup Stuffs
 #define PIN         45 // On Trinket or Gemma, suggest changing this to 1
 #define NUMPIXELS   2 // Popular NeoPixel ring size
 #define DELAYVAL    500 // Time (in milliseconds) to pause between pixels
 int errorQueued = 0; //Flag to indicate if an error has been queued for the NeoPixel
+int nightMode = 0; //Flag to indicate if night mode is enabled
 
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_RGB + NEO_KHZ800);
 
@@ -266,7 +270,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
             alertQueue[i].isWarning = 0;
             alertQueue[i].isSilenced = 0;
             alertQueue[i].isCleared = 0;
-            baseStationState = 3;
+            baseStationState = 4;
             errorQueued = 1;
             delay(10);
             break;
@@ -512,7 +516,7 @@ void receivedMQTTMessage(char* topic, byte* payload, unsigned int length) {
 }
 
 void annoyingBuzz() {
-  if (digitalRead(1) == HIGH) {
+  if (digitalRead(1) == HIGH && antiBuzzer == 0) {
   //for(int i = 0; i < 1; i++){
     digitalWrite(48, HIGH);
     //Serial.println("Bzzzzz");
@@ -976,7 +980,6 @@ void setup() {
         NULL,       /* Task handle. */
         1);         /* Core where the task should run */
 
-
     baseStationState = 0;
 }
 
@@ -986,7 +989,7 @@ void loop() {
 
     //Go to screen saver after 5 seconds should no button be pressed
     if (baseStationState == 1) {
-      if (millis() >= lastInput + 5000) {
+      if (millis() >= lastInput + 7000) {
         // Serial.println("Screen Saver Timeout");
         baseStationState = 0;
       }
@@ -1027,9 +1030,9 @@ void loop() {
       // Serial.println("Button 47 pressed");
       screenSaverRunning = false;
       lastInput = millis();
-      if (baseStationState == 3) {
+      if (baseStationState == 4) {
         } else {
-        if (baseStationState > 1) {
+        if (baseStationState > 2) {
           baseStationState = 0;
           } else {
           baseStationState ++;
@@ -1043,7 +1046,7 @@ void loop() {
       }
     for (int i = 0; i < 50; i++) {
       if (alertQueue[i].isSilenced == 0) {
-        baseStationState = 3;
+        baseStationState = 4;
         }
       }
     delay(25);
@@ -1054,36 +1057,56 @@ void loop() {
 void mainUIDisplayTask(void *parameters) {
   long lastScreenSaver;
   long lastCurrentTest;
+  long buttPress;
   int errorNumber;
+  int state3screen = 0;
   while (1) {
     //switch case for the main UI display
     switch (baseStationState) {
 
       case 0:
         //Screen Saver
-        if (screenSaverRunning == false) {
-          // Serial.println("Starting Screen Saver");
-          screenSaverRunning = true;
-          display.clearDisplay();
-          display.drawBitmap(
-          random(1, (display.width() - LOGO_WIDTH)),
-          //(display.height() / 4),
-          2,
-          logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-          display.display();
-          lastScreenSaver = millis();
-          }
-        if (millis() > lastScreenSaver + 15000) {
-          // Serial.println("Running Screen Saver");
-          display.clearDisplay();
-          display.drawBitmap(
-          random(1, (display.width() - LOGO_WIDTH)),
-          //(display.height() / 4),
-          2,
-          logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-          display.display();
-          lastScreenSaver = millis();
-          }
+        if (nightMode == 1) {
+          if (screenSaverRunning == false) {
+            // Serial.println("Starting Screen Saver");
+            screenSaverRunning = true;
+            display.clearDisplay();
+            display.drawBitmap(
+              random(1, (display.width() - LOGO_WIDTH)),
+              //(display.height() / 4),
+              2,
+              logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+            display.display();
+            lastScreenSaver = millis();
+            }
+          if (millis() > lastScreenSaver + 15000) {
+            // Serial.println("Running Screen Saver");
+            display.clearDisplay();
+            display.drawBitmap(
+              random(1, (display.width() - LOGO_WIDTH)),
+              //(display.height() / 4),
+              2,
+              logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+            display.display();
+            lastScreenSaver = millis();
+            }
+        } else {
+          if (screenSaverRunning == false) {
+            screenSaverRunning = true;
+            display.clearDisplay();
+            display.drawBitmap(
+              (display.width()  - LOGO_WIDTH ) / 2,
+              ((display.height() / 4) + 2),
+              logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+            display.display();
+            lastScreenSaver = millis();
+            }
+          if (millis() > lastScreenSaver + 5000) {
+            display.clearDisplay();
+            display.display();
+            lastScreenSaver = millis();
+            }
+        }
         delay(25);
         break;
 
@@ -1149,11 +1172,11 @@ void mainUIDisplayTask(void *parameters) {
               for (int e = 0; e < 50; e++) {
                 if (alertQueue[e].isSilenced == 0) {
                   // Serial.println("Move to Interupt Error Page");
-                  baseStationState = 3;
+                  baseStationState = 4;
                   break;
                 }
               }
-              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 || baseStationState == 4) { 
                 break;
               }
               if (digitalRead(21) == LOW) {
@@ -1213,7 +1236,244 @@ void mainUIDisplayTask(void *parameters) {
         delay(25);
         break;
 
-      case 3:  
+      case 3:
+        if (state3screen == 0) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("Base Station ID:"));
+          display.println(baseStationID);
+          display.setCursor(10, 27);
+          display.print(F("Current WiFi:"));
+          display.setCursor(10, 37); 
+          display.println(WiFi.SSID());
+          display.setCursor(10, 47);
+          display.print(F("Hit MUTE for more"));
+          display.setCursor(10, 57);
+          display.println(F("options."));
+          display.display(); // Show initial text
+            while (state3screen == 0 && baseStationState == 4) { 
+              delay(10);
+              for (int e = 0; e < 50; e++) {
+                if (alertQueue[e].isSilenced == 0) {
+                  baseStationState = 3;
+                  break;
+                }
+              }
+              if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+                break;
+              }
+              if (digitalRead(21) == LOW) {
+                while(digitalRead(21) == LOW){
+                  delay(10);
+                  }
+                  state3screen = 1;
+                  lastInput = millis();
+                }
+              }
+        }
+        if (state3screen == 1) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("Toggle CANBus"));
+          display.setCursor(10, 27);
+          display.print(F("Hold mute for 3"));
+          display.setCursor(10, 37); 
+          display.println(F("seconds to toggle."));
+          display.setCursor(10, 47);
+          display.print(F("Tap MUTE for next"));
+          display.setCursor(10, 57);
+          display.println(F("setting."));
+          display.display(); // Show initial text
+          while (state3screen == 1 && baseStationState == 3) {   
+            delay(10);
+            for (int e = 0; e < 50; e++) {
+              if (alertQueue[e].isSilenced == 0) {
+                baseStationState = 3;
+                break;
+              }
+            }
+            if (baseStationState == 0 || baseStationState == 2 || baseStationState == 3 ) {
+              break;
+            }
+            if (digitalRead(21) == LOW) {
+              buttPress = millis();
+              while(digitalRead(21) == LOW){
+                delay(10);
+                } 
+                if (millis() > buttPress + 3000) {
+                  if (digitalRead(11) == HIGH) {
+                    // The Action
+                    screenSaverRunning = false;
+                    baseStationState = 5;
+                    MQTTdisconnect();
+                    digitalWrite(11, LOW);
+                  }
+                } else {
+                  state3screen = 2;
+                  lastInput = millis();
+                }
+            }
+          }
+        }
+        if (state3screen == 2) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("Buzzer Mute"));
+          display.setCursor(10, 27);
+          display.print(F("hold MUTE 3 seconds"));
+          display.setCursor(10, 37);
+          display.print(F("to toggle."));
+          display.setCursor(10, 47);
+          display.print(F("Tap MUTE for next"));
+          display.setCursor(10, 57);
+          display.println(F("option."));
+          display.display(); // Show initial text
+          while (state3screen == 2 && baseStationState == 3) {
+            delay(10);
+            for (int e = 0; e < 50; e++) {
+              if (alertQueue[e].isSilenced == 0) {
+                baseStationState = 4;
+                break;
+              }
+            }
+            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+              break;
+            }
+            if (digitalRead(21) == LOW) {
+              buttPress = millis();
+              while(digitalRead(21) == LOW){
+                delay(10);
+              } 
+              if (millis() > buttPress + 3000) {
+                if (digitalRead(11) == HIGH) {
+                  // The Action
+                  if (antiBuzzer == 0) {
+                    antiBuzzer = 1;
+                  } else {
+                    antiBuzzer = 0;
+                  }
+                } else {
+                  state3screen = 3;
+                  lastInput = millis();
+                }
+              }
+            }
+          }
+        }
+        if (state3screen == 3) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("Dark Mode"));
+          display.setCursor(10, 27);
+          display.print(F("Hold MUTE for 3"));
+          display.setCursor(10, 37);
+          display.print(F("seconds to toggle."));
+          display.setCursor(10, 47);
+          display.print(F("Tap MUTE for next"));
+          display.setCursor(10, 57);
+          display.println(F("option."));
+          display.display(); // Show initial text
+          while (state3screen == 3 && baseStationState == 3) {
+            delay(10);
+            for (int e = 0; e < 50; e++) {
+              if (alertQueue[e].isSilenced == 0) {
+                baseStationState = 4;
+                break;
+              }
+            }
+            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+              break;
+            }
+            if (digitalRead(21) == LOW) {
+              buttPress = millis();
+              while(digitalRead(21) == LOW){
+                delay(10);
+              } 
+              if (millis() > buttPress + 3000) {
+                if (digitalRead(11) == HIGH) {
+                  // The Action
+                  // Set the nightMode flag opposite of what it is
+                  if (nightMode == 0) {
+                    nightMode = 1;
+                  } else {
+                    nightMode = 0;
+                  }
+                } else {
+                  state3screen = 4;
+                  lastInput = millis();
+                }
+              }
+            }
+          }
+        }
+        if (state3screen == 4) {
+          display.clearDisplay();
+          display.setTextSize(2); // Draw 2X-scale text
+          display.setCursor(1, 1);
+          display.println(F("Settings:"));
+          display.setTextSize(1); // Draw 1X-scale text
+          display.setCursor(10, 17);
+          display.print(F("RESTART SYSTEM"));
+          display.setCursor(10, 27);
+          display.print(F("Hold MUTE for 5"));
+          display.setCursor(10, 37);
+          display.print(F("seconds to restart."));
+          display.setCursor(10, 47);
+          display.print(F("Tap MUTE for next"));
+          display.setCursor(10, 57);
+          display.println(F("option."));
+          display.display(); // Show initial text
+          while (state3screen == 3 && baseStationState == 3) {
+            delay(10);
+            for (int e = 0; e < 50; e++) {
+              if (alertQueue[e].isSilenced == 0) {
+                baseStationState = 4;
+                break;
+              }
+            }
+            if (baseStationState == 0 || baseStationState == 1 || baseStationState == 2 || baseStationState == 3 ) {
+              break;
+            }
+            if (digitalRead(21) == LOW) {
+              buttPress = millis();
+              while(digitalRead(21) == LOW){
+                delay(10);
+              } 
+              if (millis() > buttPress + 5000) {
+                if (digitalRead(11) == HIGH) {
+                  // The Action
+                  // Shut down the whole ESP32
+                  ESP.restart();
+
+                }
+              } else {
+                state3screen = 0;
+                lastInput = millis();
+              }
+            }
+          }
+        }
+        //Base Station Utilities
+        delay(25);
+        break;
+
+      case 4:  
         //Error Warning Screen    
         for (int i = 0; i < 50; i++) {
           if (alertQueue[i].isSilenced == 0) {
@@ -1223,7 +1483,9 @@ void mainUIDisplayTask(void *parameters) {
             display.setTextSize(2); // Draw 2X-scale text
             display.setTextColor(SSD1306_WHITE);
             display.setCursor(1, 1);
-            display.println(F("!!Error:"));
+            display.print(F("!!Error "));
+            display.print(i + 1);
+            display.println(F(":"));
             display.setTextSize(1); // Draw 1X-scale text
             display.setCursor(10, 17);
             display.println(F("Error on node"));
@@ -1293,11 +1555,6 @@ void mainUIDisplayTask(void *parameters) {
           baseStationState = 1;
           break;
 
-      case 4:
-        //Base Station Utilities
-        delay(25);
-        break;
-
       case 5:
         //CANBus OFF
         display.clearDisplay();
@@ -1307,8 +1564,39 @@ void mainUIDisplayTask(void *parameters) {
         display.println(F("CANBus"));
         display.setCursor(10, 37);
         display.println(F("Offline"));
+        display.setTextSize(1); // Draw 1X-scale text
+        display.setCursor(10, 47);
+        display.println(F("Hold MUTE to"));
+        display.setCursor(10, 57);
+        display.println(F("reconnect."));
         display.display(); // Show initial text
         delay(25);
+        while (baseStationState == 5) {
+          delay(25);
+          if (digitalRead(21) == LOW) {
+            long buttPress = millis();
+            while(digitalRead(21) == LOW){
+              delay(10);
+              } 
+              if (millis() > buttPress + 5000) {
+                if (digitalRead(11) == HIGH) {
+               
+                  Serial.println("CANBus On");
+                  screenSaverRunning = false;
+                  baseStationState = 0;    
+                  xTaskCreatePinnedToCore(
+                    mqttLoop,   /* Function to implement the task */
+                    "mqttLoop", /* Name of the task */
+                    10000,      /* Stack size in words */
+                    NULL,       /* Task input parameter */
+                    1,          /* Priority of the task */
+                    &xMQTTloop,  /* Task handle. */
+                    0);         /* Core where the task should run */
+                  }
+                }
+                lastInput = millis();
+            }
+          }
         break;
 
       default:
@@ -1328,25 +1616,27 @@ void neoPixelTask(void *parameters) {
     {
     case 0:
       //Screen Saver breathing
-      for (int i = 0; i < 150; i++) {
-        if (baseStationState != 0) {
-          break;
+      if (nightMode == 0) {
+        for (int i = 0; i < 150; i++) {
+          if (baseStationState != 0) {
+            break;
+          }
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.show();
+          delay(25);
         }
-        pixels.clear();
-        pixels.setPixelColor(0, pixels.Color((150 - (i)), 0, 0));
-        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-        pixels.show();
-        delay(25);
-      }
-      for (int i = 0; i < 150; i++) {
-        if (baseStationState != 0) {
-          break;
+        for (int i = 0; i < 150; i++) {
+          if (baseStationState != 0) {
+            break;
+          }
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.show();
+          delay(25);
         }
-        pixels.clear();
-        pixels.setPixelColor(0, pixels.Color((0 + (i)), 0, 0));
-        pixels.setPixelColor(1, pixels.Color(0, 0, 0));
-        pixels.show();
-        delay(25);
       }
       break;
 
@@ -1424,6 +1714,28 @@ void neoPixelTask(void *parameters) {
         }
       }
       break;
+
+    case 4:
+      //Settings Lighting
+      if (millis() >= lightingLoop + 1500) {
+        lightingLoop = millis();
+        if (lightingLoopState == 0) {
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(10, 0, 0));
+          pixels.setPixelColor(1, pixels.Color(10, 0, 10));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoopState = 1;
+          delay(25); // Pause before next pass through loop
+        } else {
+          pixels.clear();
+          pixels.setPixelColor(0, pixels.Color(10, 0, 0));
+          pixels.setPixelColor(1, pixels.Color(0, 0, 0));
+          pixels.show();   // Send the updated pixel colors to the hardware.
+          lightingLoopState = 0;
+          delay(25); // Pause before next pass through loop
+        }
+      }
+
 
     case 5:
       //CANBus OFF
