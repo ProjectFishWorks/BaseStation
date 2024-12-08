@@ -1,0 +1,12 @@
+Removed Pin From Net: NetName=GPIO12/ADC2_1 Pin=J4-1
+Removed Pin From Net: NetName=GPIO13/ADC2_2 Pin=J5-1
+Removed Pin From Net: NetName=GPIO11/ADC2_0 Pin=J6-2
+Removed Pin From Net: NetName=GPIO14/ADC2_3 Pin=J9-1
+Removed Pin From Net: NetName=GPIO45 Pin=U4-2
+Removed Pin From Net: NetName=GPIO48 Pin=U4-4
+Added Pin To Net: NetName=GPIO14/ADC2_3 Pin=J4-1
+Added Pin To Net: NetName=GPIO45 Pin=J5-1
+Added Pin To Net: NetName=GPIO13/ADC2_2 Pin=J6-2
+Added Pin To Net: NetName=GPIO48 Pin=J9-1
+Added Pin To Net: NetName=GPIO12/ADC2_1 Pin=U4-2
+Added Pin To Net: NetName=GPIO11/ADC2_0 Pin=U4-4

@@ -1,0 +1,4 @@
+Remove Pin=J8-5 From Net=GPIO1/ADC1_0
+Remove Pin=J8-6 From Net=GPIO2/ADC1_1
+Add Pin To Net: Pin=J8-5 Old Net=GPIO1/ADC1_0 New Net=RXD
+Add Pin To Net: Pin=J8-6 Old Net=GPIO2/ADC1_1 New Net=TXD

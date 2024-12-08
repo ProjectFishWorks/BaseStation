@@ -1,0 +1,10 @@
+Removed Pin From Net: NetName=GPIO20 Pin=J3-3
+Removed Pin From Net: NetName=GPIO19 Pin=J3-4
+Removed Pin From Net: NetName=GPIO18 Pin=J5-1
+Removed Pin From Net: NetName=GPIO8/ADC1_7 Pin=J9-1
+Added Pin To Net: NetName=GPIO13/ADC2_2 Pin=J3-3
+Added Pin To Net: NetName=GPIO14/ADC2_3 Pin=J3-4
+Added Pin To Net: NetName=GPIO10/ADC1_9 Pin=J4-1
+Added Pin To Net: NetName=GPIO11/ADC2_0 Pin=J5-1
+Added Pin To Net: NetName=GPIO9/ADC1_8 Pin=J6-2
+Added Pin To Net: NetName=GPIO12/ADC2_1 Pin=J9-1

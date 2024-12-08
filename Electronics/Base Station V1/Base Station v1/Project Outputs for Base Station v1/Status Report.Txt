@@ -1,0 +1,25 @@
+Output: Gerber Files
+Type  : Gerber
+From  : Variant [[No Variations]] of Project [Base Station v1.PrjPcb]
+   Generated File[Base Station v1.GTO]
+   Generated File[Base Station v1.GTP]
+   Generated File[Base Station v1.GTS]
+   Generated File[Base Station v1.GTL]
+   Generated File[Base Station v1.GP1]
+   Generated File[Base Station v1.GP2]
+   Generated File[Base Station v1.GBL]
+   Generated File[Base Station v1.GBS]
+   Generated File[Base Station v1.GBO]
+   Generated File[Base Station v1.GM1]
+   Generated File[Base Station v1.GKO]
+   Generated File[Base Station v1.GPT]
+   Generated File[Base Station v1.GPB]
+   Generated File[Base Station v1.GM]
+   Generated File[Base Station v1.EXTREP]
+   Generated File[Base Station v1.REP]
+
+
+Files Generated   : 16
+Documents Printed : 0
+
+Finished Output Generation At 1:29:09 PM On 9/23/2024

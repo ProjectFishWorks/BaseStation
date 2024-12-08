@@ -1,0 +1,3 @@
+Layer Pairs Export File for PCB: C:\Users\Public\Documents\Altium\Base Station v1\Base Station v1.PcbDoc
+LayersSetName=Top_Bot_Thru_Holes|DrillFile=base station v1.txt|DrillLayers=gtl,gp1,gp2,gbl
+LayersSetName=Top_Bot_Rect_Holes|DrillFile=base station v1-rectholes.txt|DrillLayers=gtl,gp1,gp2,gbl

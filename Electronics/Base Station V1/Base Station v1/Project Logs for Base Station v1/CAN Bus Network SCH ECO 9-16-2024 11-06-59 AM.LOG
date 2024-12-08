@@ -1,0 +1,2 @@
+Remove Pin=J3-3 From Net=SCL0
+Remove Pin=J3-4 From Net=SDA0

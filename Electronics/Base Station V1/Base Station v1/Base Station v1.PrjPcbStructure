@@ -1,0 +1,4 @@
+Record=TopLevelDocument|FileName=CAN Bus Network.SchDoc|SheetNumber=4
+Record=NoMainPathDocument|SourceDocument=CAN Bus Network.SchDoc|FileName=ESP32_S3.SchDoc|SheetNumber=1
+Record=NoMainPathDocument|SourceDocument=CAN Bus Network.SchDoc|FileName=IO.SchDoc|SheetNumber=2
+Record=NoMainPathDocument|SourceDocument=CAN Bus Network.SchDoc|FileName=Power and CAN Bus.SchDoc|SheetNumber=3

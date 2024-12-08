@@ -1,0 +1,4 @@
+Removed Member From Class: ClassName=Power and CAN Bus Member=J12
+Change Component Designator: OldDesignator=J12 NewDesignator=J10
+Change Component Designator: OldDesignator=J13 NewDesignator=J11
+Added Member To Class: ClassName=Power and CAN Bus Member=Component J10 TSW-102-07-G-S

@@ -1,0 +1,64 @@
+Removed Pin From Net: NetName=+5.0 V Pin=J7-2
+Removed Pin From Net: NetName=+3.3 V Pin=J7-9
+Change Component Designator: OldDesignator=R9 NewDesignator=R3
+Change Component Designator: OldDesignator=R10 NewDesignator=R4
+Change Component Designator: OldDesignator=R11 NewDesignator=R5
+Change Component Designator: OldDesignator=R12 NewDesignator=R6
+Change Component Designator: OldDesignator=R13 NewDesignator=R7
+Change Component Designator: OldDesignator=R14 NewDesignator=R8
+Change Component Designator: OldDesignator=R15 NewDesignator=R9
+Change Component Designator: OldDesignator=R16 NewDesignator=R10
+Added Component: Designator=R2(CAF-50P380X160-16N)
+Add component (AddParameter): Name = "Case/Package"; Value = "1506"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Channels"; Value = "8"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Connector Type"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Construction"; Value = "Chip"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Element Power Dissipation"; Value = "63mW"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "First Element Resistance"; Value = "10kR"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Gender"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "JESD-609 Code"; Value = "e3"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Current Rating"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Operating Temperature"; Value = "125°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Min Operating Temperature"; Value = "-55°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mounting Technology"; Value = "Surface Mount"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Network Type"; Value = "Isolated"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Elements"; Value = "1"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Height"; Value = "0.45mm"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Length"; Value = "3.8mm"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Shape"; Value = "Rectangular"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Style"; Value = "SMTMeter"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Width"; Value = "1.6mm"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packaging"; Value = "Tape and Reel"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Pins"; Value = "16"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Power"; Value = "250mW"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Rated Temperature"; Value = "70°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Reach SVHC Compliant"; Value = "Yes"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Reference Standard"; Value = "AEC-Q200"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Resistor Type"; Value = "ARRAY/NETWORK RESISTOR"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RoHS Compliant"; Value = "Yes"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Technology"; Value = "METAL GLAZE/THICK FILM"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Temperature Coefficient"; Value = "200ppm/°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Terminal Finish"; Value = "Nickel"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Termination"; Value = "Wraparound"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Tolerance"; Value = "5%"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Value"; Value = "10kR"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Voltage Rating"; Value = ""; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Working Voltage"; Value = "25V"; VariantName = "[No Variations]"
+Added Pin To Net: NetName=+3.3 V Pin=J7-2
+Added Pin To Net: NetName=+5.0 V Pin=J7-9
+Added Pin To Net: NetName=+3.3 V Pin=R2-1
+Added Pin To Net: NetName=+3.3 V Pin=R2-2
+Added Pin To Net: NetName=+3.3 V Pin=R2-4
+Added Pin To Net: NetName=+3.3 V Pin=R2-5
+Added Pin To Net: NetName=+3.3 V Pin=R2-6
+Added Pin To Net: NetName=+3.3 V Pin=R2-7
+Added Pin To Net: NetName=+3.3 V Pin=R2-8
+Added Pin To Net: NetName=SD_CD Pin=R2-9
+Added Pin To Net: NetName=SD_DAT3_CD Pin=R2-10
+Added Pin To Net: NetName=SD_DAT2 Pin=R2-11
+Added Pin To Net: NetName=SD_DAT1 Pin=R2-12
+Added Pin To Net: NetName=SD_DAT0 Pin=R2-13
+Added Pin To Net: NetName=SD_CMD Pin=R2-15
+Added Pin To Net: NetName=SD_CLK Pin=R2-16
+Change Net Name : Old Net Name=NetR10_1 New Net Name=NetR4_1
+Added Member To Class: ClassName=IO Member=Component R2 EXB-2HV103JV

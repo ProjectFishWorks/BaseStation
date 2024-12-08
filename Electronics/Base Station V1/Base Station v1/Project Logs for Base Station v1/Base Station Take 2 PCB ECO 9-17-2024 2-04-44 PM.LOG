@@ -1,0 +1,28 @@
+Removed Pin From Net: NetName=GPIO4/ADC1_3 Pin=J1-4
+Removed Pin From Net: NetName=GPIO5/ADC1_4 Pin=J1-5
+Removed Pin From Net: NetName=GPIO6/ADC1_5 Pin=J1-6
+Removed Pin From Net: NetName=GPIO7/ADC1_6 Pin=J1-7
+Removed Pin From Net: NetName=GPIO15 Pin=J1-8
+Removed Pin From Net: NetName=GPIO16 Pin=J1-9
+Removed Pin From Net: NetName=GPIO17 Pin=J1-10
+Removed Member From Class: ClassName=IO Member=R10
+Removed Member From Class: ClassName=IO Member=R11
+Removed Member From Class: ClassName=IO Member=R12
+Removed Member From Class: ClassName=IO Member=R13
+Removed Member From Class: ClassName=IO Member=R14
+Removed Member From Class: ClassName=IO Member=R15
+Removed Member From Class: ClassName=Power and CAN Bus Member=R15
+Added Pin To Net: NetName=SD_CD Pin=J1-4
+Added Pin To Net: NetName=SD_DAT2 Pin=J1-5
+Added Pin To Net: NetName=SD_DAT0 Pin=J1-6
+Added Pin To Net: NetName=SD_CLK Pin=J1-7
+Added Pin To Net: NetName=SD_CMD Pin=J1-8
+Added Pin To Net: NetName=SD_DAT3_CD Pin=J1-9
+Added Pin To Net: NetName=SD_DAT2 Pin=J1-10
+Added Member To Class: ClassName=IO Member=Component R3 RC0805FR-1010KL
+Added Member To Class: ClassName=IO Member=Component R4 RC0805FR-1010KL
+Added Member To Class: ClassName=IO Member=Component R5 RC0805FR-1010KL
+Added Member To Class: ClassName=IO Member=Component R6 RC0805FR-1010KL
+Added Member To Class: ClassName=IO Member=Component R7 RC0805FR-1010KL
+Added Member To Class: ClassName=IO Member=Component R8 RC0805FR-1010KL
+Added Member To Class: ClassName=Power and CAN Bus Member=Component R9 1.5k

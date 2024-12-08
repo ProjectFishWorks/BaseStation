@@ -1,0 +1,8 @@
+Removed Pin From Net: NetName=+3.3 V Pin=J7-2
+Removed Pin From Net: NetName=+5.0 V Pin=J7-9
+Change Component Footprint: Designator=J7 Old Footprint=61300911121 New Footprint=61300911121
+Change Component Footprint: Designator=J8 Old Footprint=61300911121 New Footprint=61300911121
+Change Managed Component Library Link : Designator=J7 Old VaultGUID=F0EA7655-FA0E-4432-8B6C-BCDBF6CF24B5 New VaultGUID=F0EA7655-FA0E-4432-8B6C-BCDBF6CF24B5 Old ItemGUID=f050df3a-82b3-46b4-bc9e-f69a3112c966 New ItemGUID=f050df3a-82b3-46b4-bc9e-f69a3112c966 Old RevisionGUID=b13b425d-9ce5-48b6-b86d-e168022da578 New RevisionGUID=72f4cf68-663d-4ce7-8cf1-3fae91670fb4
+Change Managed Component Library Link : Designator=J8 Old VaultGUID=F0EA7655-FA0E-4432-8B6C-BCDBF6CF24B5 New VaultGUID=F0EA7655-FA0E-4432-8B6C-BCDBF6CF24B5 Old ItemGUID=f050df3a-82b3-46b4-bc9e-f69a3112c966 New ItemGUID=f050df3a-82b3-46b4-bc9e-f69a3112c966 Old RevisionGUID=b13b425d-9ce5-48b6-b86d-e168022da578 New RevisionGUID=72f4cf68-663d-4ce7-8cf1-3fae91670fb4
+Added Pin To Net: NetName=+5.0 V Pin=J7-2
+Added Pin To Net: NetName=+3.3 V Pin=J7-9

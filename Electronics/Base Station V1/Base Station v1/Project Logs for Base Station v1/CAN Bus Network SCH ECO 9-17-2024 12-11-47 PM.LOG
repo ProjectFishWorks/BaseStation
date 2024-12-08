@@ -1,0 +1,36 @@
+Remove Pin=J3-3 From Net=SDA0
+Remove Pin=J3-4 From Net=SCL0
+Remove Pin=J4-1 From Net=Buzzer
+Remove Pin=J5-1 From Net=Butt0
+Remove Pin=J6-2 From Net=Neo0
+Remove Pin=J7-3 From Net=GPIO3/ADC1_2
+Remove Pin=J7-4 From Net=GPIO9/ADC1_8
+Remove Pin=J7-5 From Net=GPIO10/ADC1_9
+Remove Pin=J7-6 From Net=GPIO11/ADC2_0
+Remove Pin=J7-7 From Net=GPIO12/ADC2_1
+Remove Pin=J8-2 From Net=GPIO13/ADC2_2
+Remove Pin=J8-3 From Net=GPIO14/ADC2_3
+Remove Pin=J8-4 From Net=GPIO21
+Remove Pin=J8-5 From Net=GPIO47
+Remove Pin=J8-6 From Net=GPIO48
+Remove Pin=J9-1 From Net=Butt1
+Add Pin To Net: Pin=J3-3 Old Net=SDA0 New Net=GPIO20
+Add Pin To Net: Pin=J3-4 Old Net=SCL0 New Net=GPIO19
+Add Pin To Net: Pin=J4-1 Old Net=Buzzer New Net=GPIO17
+Add Pin To Net: Pin=J5-1 Old Net=Butt0 New Net=GPIO18
+Add Pin To Net: Pin=J6-2 Old Net=Neo0 New Net=GPIO16
+Add Pin To Net: Pin=J7-3 Old Net=GPIO3/ADC1_2 New Net=GPIO4/ADC1_3
+Add Pin To Net: Pin=J7-4 Old Net=GPIO9/ADC1_8 New Net=GPIO5/ADC1_4
+Add Pin To Net: Pin=J7-5 Old Net=GPIO10/ADC1_9 New Net=GPIO6/ADC1_5
+Add Pin To Net: Pin=J7-6 Old Net=GPIO11/ADC2_0 New Net=GPIO7/ADC1_6
+Add Pin To Net: Pin=J7-7 Old Net=GPIO12/ADC2_1 New Net=GPIO15
+Add Pin To Net: Pin=J8-2 Old Net=GPIO13/ADC2_2 New Net=GPIO40
+Add Pin To Net: Pin=J8-3 Old Net=GPIO14/ADC2_3 New Net=GPIO41
+Add Pin To Net: Pin=J8-4 Old Net=GPIO21 New Net=GPIO42
+Add Pin To Net: Pin=J8-7 Old Net=TXD New Net=GPIO2/ADC1_1
+Add Pin To Net: Pin=J8-8 Old Net=RXD New Net=GPIO1/ADC1_0
+Add Pin To Net: Pin=J9-1 Old Net=Butt1 New Net=GPIO8/ADC1_7
+Change Pin Designator/Name:  Old Designator=J7-2 Old Name=2 New Designator =9 New Name=9
+Change Pin Designator/Name:  Old Designator=J7-9 Old Name=9 New Designator =2 New Name=2
+Change Pin Designator/Name:  Old Designator=J8-7 Old Name=7 New Designator =6 New Name=6
+Change Pin Designator/Name:  Old Designator=J8-8 Old Name=8 New Designator =5 New Name=5

@@ -1,0 +1,7 @@
+Removed Member From Class: ClassName=Power and CAN Bus Member=J9
+Added Member To Class: ClassName=Power and CAN Bus Member=Component C6 22uF
+Added Member To Class: ClassName=Power and CAN Bus Member=Component C7 22uF
+Added Member To Class: ClassName=Power and CAN Bus Member=Component C9 10uF
+Added Member To Class: ClassName=Power and CAN Bus Member=Component C10 10uF
+Added Member To Class: ClassName=IO Member=Component J8 61300911121
+Added Member To Class: ClassName=Power and CAN Bus Member=Component J10 TSW-102-07-G-S

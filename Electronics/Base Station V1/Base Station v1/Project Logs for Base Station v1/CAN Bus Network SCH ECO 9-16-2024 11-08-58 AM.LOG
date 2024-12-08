@@ -1,0 +1,4 @@
+Remove Pin=J1-26 From Net=SCL1
+Remove Pin=J3-3 From Net=SDA0
+Remove Pin=J3-4 From Net=SCL0
+Add Pin To Net: Pin=J1-26 Old Net=SCL1 New Net=SCL0
