@@ -31,6 +31,9 @@
 
 //--------------------------------------
 
+#define NODE_ID 100
+#define LED_BRIGHTNESS_MESSAGE_ID 2560
+
 // CAN Bus message IDs for warnings and alerts
 #define WARN_ID 0x384  // 900
 #define ALERT_ID 0x385 // 901
@@ -924,7 +927,7 @@ void setup()
   // Start the NTP Client
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
-  // For some reson if I don't include a call to getLocalTime here, the time is not set correctly and we get hour values of larger than 24
+  // For some reason if I don't include a call to getLocalTime here, the time is not set correctly and we get hour values of larger than 24
   struct tm timeinfo;
   getLocalTime(&timeinfo);
 
