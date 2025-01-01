@@ -31,8 +31,10 @@
 
 //--------------------------------------
 
-#define NODE_ID 100
+#define NODE_ID 0
 #define LED_BRIGHTNESS_MESSAGE_ID 2560
+#define ERROR_STATUS 2561
+#define RESET_ALERTS 2562
 
 // CAN Bus message IDs for warnings and alerts
 #define WARN_ID 0x384  // 900
@@ -42,8 +44,8 @@
 #define baseStationFirmwareVersion 0.01
 
 // TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
-#define systemID 0x00
-#define baseStationID 0x00
+#define systemID 0x00             // Leave
+#define baseStationID 0x03        // change for desired base station ID
 
 // TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
@@ -450,6 +452,34 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length)
       Serial.print(messageID, HEX);
       Serial.print(" Data: ");
       Serial.println(data, HEX);
+
+      if (nodeID == NODE_ID)
+      {
+        Serial.println("Message received to self");
+        // Check for messages
+        switch (messageID)
+        {
+        case LED_BRIGHTNESS_MESSAGE_ID:
+          Serial.println("LED Brightness message received");
+          LEDBrightness = data;
+          pixels.setBrightness(LEDBrightness);
+          pixels.show();
+          break;
+
+          case RESET_ALERTS:
+            Serial.println("Reset alerts message received");
+            for (int i = 0; i < 50; i++)
+            {
+              alertQueue[i].isCleared = 1;
+            }
+            break;
+
+        default:
+          Serial.println("Unknown message ID");
+          break;
+        }
+      }
+      
 
       // Create a CAN Bus message
       twai_message_t message = core.create_message(messageID, nodeID, &data);
