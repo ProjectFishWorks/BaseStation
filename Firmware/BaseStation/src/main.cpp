@@ -1,30 +1,20 @@
 // Imports
 #include <Arduino.h>
-
 #include "credential.h"
-
 #include <WiFi.h>
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
-
 #include "WiFiClientSecure.h"
-
 #include <BaseStationCore.h>
-
 #include <PubSubClient.h>
-
 #include <ArduinoJson.h>
-
 #include "emailClient.h"
-
 #include <dataLogging.h>
-
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_INA219.h>
-
 #include "FS.h"
 #include <LittleFS.h>
 #include <time.h>
@@ -32,6 +22,7 @@
 //--------------------------------------
 
 #define NODE_ID 0
+#define maxPWM 255
 #define LED_BRIGHTNESS_MESSAGE_ID 2560
 #define ERROR_STATUS 2561
 #define RESET_ALERTS 2562
@@ -48,12 +39,15 @@
 #define baseStationID 0x03        // change for desired base station ID
 
 // TODO: MQTT Credentials - temp until these are added to WiFiManager system
-char mqtt_server[255] = "ce739858516845f790a6ae61e13368f9.s1.eu.hivemq.cloud";
+char mqtt_server[255] = "projectfishworks.ca";
 char mqtt_username[255] = "fishworks-dev";
 char mqtt_password[255] = "F1shworks!";
 
-char email_recipient[255] = "sebastien@robitaille.info";
-char email_recipient_name[255] = "Sebastien Robitaille";
+//char email_recipient[255] = "sebastien@robitaille.info";
+//char email_recipient_name[255] = "Sebastien Robitaille";
+
+char email_recipient[255] = "kayleb_s@hotmail.com";
+char email_recipient_name[255] = "Kayleb Stetsko";
 
 TaskHandle_t xMQTTloop = NULL;
 
@@ -259,6 +253,8 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
     {
       Serial.println("Alert or Warning message received!!");
 
+      //core.sendMessage(ALERT_ID, &data);
+
       // Send to email queue
       AlertData alertData;
       alertData.nodeID = nodeID;
@@ -461,7 +457,7 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length)
         {
         case LED_BRIGHTNESS_MESSAGE_ID:
           Serial.println("LED Brightness message received");
-          LEDBrightness = data;
+          LEDBrightness = ((maxPWM / 100.0) * data);
           pixels.setBrightness(LEDBrightness);
           pixels.show();
           break;
@@ -470,7 +466,7 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length)
             Serial.println("Reset alerts message received");
             for (int i = 0; i < 50; i++)
             {
-              alertQueue[i].isCleared = 1;
+              alertQueue[i].isSilenced = 1;
             }
             break;
 
