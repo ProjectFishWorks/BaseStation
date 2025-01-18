@@ -19,6 +19,10 @@
 #include <LittleFS.h>
 #include <time.h>
 
+#include "deviceAuthorization.h"
+#include "auth0DeviceAuthorization.h"
+#include "mqttLogin.h"
+
 //--------------------------------------
 
 #define NODE_ID 0
@@ -48,6 +52,8 @@ char mqtt_password[255] = "F1shworks!";
 
 char email_recipient[255] = "kayleb_s@hotmail.com";
 char email_recipient_name[255] = "Kayleb Stetsko";
+
+MQTTLogin mqttLogin;
 
 TaskHandle_t xMQTTloop = NULL;
 
@@ -316,7 +322,9 @@ void MQTTConnect()
     clientId += String(random(0xffff), HEX);
 
     // Attempt to connect
-    if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password))
+    Serial.print("Connecting to MQTT broker: ");
+    Serial.println(mqttLogin.getServer());
+    if (mqttClient.connect(mqttLogin.getClientId(), mqttLogin.getUsername(), mqttLogin.getPassword()))
     {
       Serial.println("connected");
       // Subscribe to the MQTT topic for this base station
@@ -964,8 +972,18 @@ void setup()
   // espClient.setCACert(CA_cert);
   espClient.setInsecure();
 
+  //Authrise the device
+
+  DeviceAuthorization* deviceAuthorization;
+
+  Auth0DeviceAuthorization auth0DeviceAuthorization = Auth0DeviceAuthorization();
+
+  deviceAuthorization = &auth0DeviceAuthorization;
+
+  mqttLogin = deviceAuthorization->getMQTTLogin();
+
   // Set the MQTT server and port
-  mqttClient.setServer(mqtt_server, 8883);
+  mqttClient.setServer(mqttLogin.getServer(), 8883);
 
   // Set the MQTT callback function
   mqttClient.setCallback(receivedMQTTMessage);
