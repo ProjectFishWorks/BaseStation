@@ -12,7 +12,7 @@ public:
     Auth0DeviceAuthorization() = default;
     ~Auth0DeviceAuthorization() override = default;
 
-    MQTTLogin getMQTTLogin() override;
+    MQTTLogin getMQTTLogin(uint8_t forceNewLogin = false) override;
 
     //Code to run when the user is required to login on a external device
     std::function<void(const char* url, const char* code)> verificationCallback;

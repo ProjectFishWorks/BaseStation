@@ -8,7 +8,7 @@ public:
     DeviceAuthorization() = default;
     virtual ~DeviceAuthorization() = default;
 
-    virtual MQTTLogin getMQTTLogin() = 0;
+    virtual MQTTLogin getMQTTLogin(uint8_t forceNewLogin = false) = 0;
 };
 
 #endif // DEVICE_AUTHORIZATION_H

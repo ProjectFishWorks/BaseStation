@@ -8,21 +8,21 @@ public:
 
     MQTTLogin() = default;
 
-    MQTTLogin(const char* server, uint16_t port, const char* clientId, const char* username, const char* password)
+    MQTTLogin(const char* server, uint16_t port, const char* clientId, const char* username, String password)
         : server(server), port(port), clientId(clientId), username(username), password(password) {}
 
-    const char* getServer() const { return server; }
-    uint16_t getPort() const { return port; }
-    const char* getClientId() const { return clientId; }
-    const char* getUsername() const { return username; }
-    const char* getPassword() const { return password; }
+    const char* getServer() { return server; }
+    uint16_t getPort() { return port; }
+    const char* getClientId() { return clientId; }
+    const char* getUsername() { return username; }
+    String getPassword() { return password; }
 
 private:
     const char* server;
     uint16_t port;
     const char* clientId;
     const char* username;
-    const char* password;
+    String password;
 };
 
 #endif // MQTTLOGIN_H

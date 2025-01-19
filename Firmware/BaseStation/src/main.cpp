@@ -227,6 +227,12 @@ void neoPixelTask(void *parameters);
 void mainUIDisplayTask(void *parameters);
 void sendWarningToQueue();
 
+//Authrise the device
+
+DeviceAuthorization* deviceAuthorization;
+
+Auth0DeviceAuthorization auth0DeviceAuthorization = Auth0DeviceAuthorization();
+
 // Function that is called when a CAN Bus message is received
 void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessage, uint64_t data)
 {
@@ -316,6 +322,12 @@ void MQTTConnect()
   while (!mqttClient.connected())
   {
     Serial.print("Attempting MQTT connection...");
+
+    mqttLogin = deviceAuthorization->getMQTTLogin(false);
+
+    // Set the MQTT server and port
+    mqttClient.setServer(mqttLogin.getServer(), mqttLogin.getPort());
+
     // Create a random client ID
     // TODO: use the system ID and base station ID to create a unique client ID?
     String clientId = "ESP8266Client-";
@@ -324,7 +336,8 @@ void MQTTConnect()
     // Attempt to connect
     Serial.print("Connecting to MQTT broker: ");
     Serial.println(mqttLogin.getServer());
-    if (mqttClient.connect(mqttLogin.getClientId(), mqttLogin.getUsername(), mqttLogin.getPassword()))
+    Serial.println(mqttLogin.getPassword());
+    if (mqttClient.connect(clientId.c_str(), "", mqttLogin.getPassword().c_str()))
     {
       Serial.println("connected");
       // Subscribe to the MQTT topic for this base station
@@ -972,18 +985,10 @@ void setup()
   // espClient.setCACert(CA_cert);
   espClient.setInsecure();
 
-  //Authrise the device
-
-  DeviceAuthorization* deviceAuthorization;
-
-  Auth0DeviceAuthorization auth0DeviceAuthorization = Auth0DeviceAuthorization();
+  // TODO: Add a check to see if the SD card is still mounted, if not remount it
+  // TODO: Add a check to see if the WiFi is still connected, if not reconnect
 
   deviceAuthorization = &auth0DeviceAuthorization;
-
-  mqttLogin = deviceAuthorization->getMQTTLogin();
-
-  // Set the MQTT server and port
-  mqttClient.setServer(mqttLogin.getServer(), 8883);
 
   // Set the MQTT callback function
   mqttClient.setCallback(receivedMQTTMessage);
@@ -994,8 +999,6 @@ void setup()
   mqttClient.setKeepAlive(30);
   mqttClient.setSocketTimeout(30);
 
-  // TODO: Add a check to see if the SD card is still mounted, if not remount it
-  // TODO: Add a check to see if the WiFi is still connected, if not reconnect
   initSDCard();
 
   initEmailClient();
