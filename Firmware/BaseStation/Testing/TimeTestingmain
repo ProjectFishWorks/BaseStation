@@ -41,10 +41,12 @@ uint64_t isErrors;
 uint64_t isNoErrors;
 
 // Time
-struct tm timeinfo;                                          // Time struct
-char localTime[64];                                          // Local time string
-int localTimeZoneOffset = 8;                                 // Timezone offset in hours
-String localTimeZone = "UTC+" + String(localTimeZoneOffset); // Default timezone is Pacific Time
+time_t UNIXTime;                                 // Unix time
+struct tm *timeinfo;                             // = localtime(&UNIXTime);                                          // Time struct
+struct tm *localtimeinfo = localtime(&UNIXTime); // Time struct
+// char localTime[64];                                          // Local time string
+// int localTimeZoneOffset = 8;                                 // Timezone offset in hours
+// String localTimeZone = "UTC+" + String(localTimeZoneOffset); // Default timezone is Pacific Time
 
 // CAN Bus message IDs for warnings and alerts
 #define WARN_ID 0x384  // 900
@@ -197,6 +199,13 @@ int CUR_SCL = 10;
 
 Adafruit_INA219 ina219(0x4A); // I2C address 0x4A or
 
+// callback notifying us of the need to save config
+void saveConfigCallback()
+{
+  Serial.println("Should save mqtt config");
+  shouldSaveConfig = true;
+}
+
 // Struct for Error Queue
 uint8_t errorsQueued = 0;
 typedef struct
@@ -228,7 +237,7 @@ QueueHandle_t log_file_queue;
 // uint64_t data = 0;
 
 // Put Functon Declarations here -----------------------------------------------------------------------------------
-void saveConfigCallback();
+
 void mqttLoop(void *_this);
 void neoPixelTask(void *parameters);
 void mainUIDisplayTask(void *parameters);
@@ -615,8 +624,18 @@ void setup() // ----------------------------------------------------------------
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // Set the time zone and NTP server--------------------------------------------------------------------------------------
 
   // For some reason if I don't include a call to getLocalTime here, the time is not set correctly and we get hour values of larger than 24
+  Serial.println("");
   struct tm timeinfo;
   getLocalTime(&timeinfo);
+  time_t UNIXTime = time(NULL);
+  // ocaltime(&UNIXTime);
+  localtimeinfo = localtime_s(&UNIXTime);
+  // localtime_r(&UNIXTime , &timeinfo);
+  Serial.println("UNIX Time: ");
+  Serial.println(UNIXTime);
+  Serial.println("localtimeinfo");
+  // Serial.println(asctime(&localtimeinfo));
+  Serial.println("");
 
   // TODO: is this were we should start the Node Controller Core?
   //  Start the Node Controller
@@ -809,12 +828,6 @@ void loop() //---------------------------------------------------Loop-----------
 
 // function definitions ----------------------------------------------------------------------------------------------------------------------------
 
-void saveConfigCallback()
-{
-  Serial.println("Should save mqtt config");
-  shouldSaveConfig = true;
-}
-
 // Function to connect to the MQTT broker
 void MQTTConnect()
 {
@@ -999,14 +1012,14 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
           Serial.println("Alerts reset");
           Serial.println("");
           break;
-
-        case UPDATE_TIMEZONE_OFFSET_MESSAGE_ID:
-          Serial.print("Update timezone message received offset= " + String(data));
-          Serial.println("");
-          localTimeZoneOffset = data;
-          localTimeZone = "UTC+" + String(localTimeZoneOffset);
-          break;
-
+          /*
+                  case UPDATE_TIMEZONE_OFFSET_MESSAGE_ID:
+                    Serial.print("Update timezone message received offset= " + String(data));
+                    Serial.println("");
+                    localTimeZoneOffset = data;
+                    localTimeZone = "UTC+" + String(localTimeZoneOffset);
+                    break;
+          */
         default:
           Serial.println("Unknown message ID");
           break;
@@ -1223,7 +1236,6 @@ void mainUIDisplayTask(void *parameters)
     // switch case for the main UI display
     switch (baseStationState)
     {
-
     case 0:
 // Screen Saver-------------------------------------------------------------------------------------------------------------------------------
 #ifdef DEBUG_BaseStationState
@@ -1234,6 +1246,7 @@ void mainUIDisplayTask(void *parameters)
 #endif
       if (nightMode == 0)
       {
+        // lastPosition = 1;
         if (screenSaverRunning == false)
         {
           Serial.println("Starting Screen Saver");
@@ -1250,8 +1263,8 @@ void mainUIDisplayTask(void *parameters)
                 1);
             display.setTextSize(2); // Draw 2X-scale text
             display.setCursor(10, 50);
-            display.println(String(timeinfo.tm_hour) + ":" + String(timeinfo.tm_min) + ":" + String(timeinfo.tm_sec));
-            lastPosition++;
+            display.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
+            lastPosition += 2;
             Serial.println("Last Position: " + String(lastPosition));
             Serial.println("");
             display.display();
@@ -1259,14 +1272,29 @@ void mainUIDisplayTask(void *parameters)
           }
           else
           {
-            lastPosition = 1;
+            lastPosition -= 2;
+            display.drawBitmap(
+                lastPosition,
+                2,
+                logo_bmp,
+                LOGO_WIDTH,
+                LOGO_HEIGHT,
+                1);
+            display.setTextSize(2); // Draw 2X-scale text
+            display.setCursor(10, 50);
+            display.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
+            lastPosition += 2;
+            Serial.println("Last Position: " + String(lastPosition));
+            Serial.println("");
+            display.display();
+            lastScreenSaver = millis();
           }
         }
         if (millis() > lastScreenSaver + 1000)
         {
           // Serial.println("Running Screen Saver");
           display.clearDisplay();
-          if (lastPosition < (display.width() - LOGO_WIDTH))
+          if (lastPosition > 0 && lastPosition < (display.width() - LOGO_WIDTH))
           {
             display.drawBitmap(
                 lastPosition,
@@ -1277,8 +1305,8 @@ void mainUIDisplayTask(void *parameters)
                 1);
             display.setTextSize(2); // Draw 2X-scale text
             display.setCursor(10, 50);
-            display.println(String(timeinfo.tm_hour) + ":" + String(timeinfo.tm_min) + ":" + String(timeinfo.tm_sec));
-            lastPosition++;
+            display.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
+            lastPosition += 2;
             Serial.println("Last Position: " + String(lastPosition));
             Serial.println("");
             display.display();
@@ -1286,7 +1314,21 @@ void mainUIDisplayTask(void *parameters)
           }
           else
           {
-            lastPosition = 1;
+            lastPosition -= 2;
+            display.drawBitmap(
+                lastPosition,
+                2,
+                logo_bmp,
+                LOGO_WIDTH,
+                LOGO_HEIGHT,
+                1);
+            display.setTextSize(2); // Draw 2X-scale text
+            display.setCursor(10, 50);
+            display.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
+            Serial.println("Last Position: " + String(lastPosition));
+            Serial.println("");
+            display.display();
+            lastScreenSaver = millis();
           }
         }
       }
@@ -1296,7 +1338,7 @@ void mainUIDisplayTask(void *parameters)
         {
           screenSaverRunning = true;
           display.clearDisplay();
-          if (lastPosition < (display.width() - LOGO_WIDTH))
+          if (lastPosition > 0 && lastPosition < (display.width() - LOGO_WIDTH))
           {
             display.drawBitmap(
                 lastPosition,
@@ -1307,8 +1349,8 @@ void mainUIDisplayTask(void *parameters)
                 1);
             display.setTextSize(2); // Draw 2X-scale text
             display.setCursor(10, 50);
-            display.println(String(timeinfo.tm_hour) + ":" + String(timeinfo.tm_min) + ":" + String(timeinfo.tm_sec));
-            lastPosition++;
+            display.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
+            lastPosition += 2;
             Serial.println("Last Position: " + String(lastPosition));
             Serial.println("");
             display.display();
@@ -1316,13 +1358,27 @@ void mainUIDisplayTask(void *parameters)
           }
           else
           {
-            lastPosition = 1;
+            lastPosition -= 2;
+            display.drawBitmap(
+                lastPosition,
+                2,
+                logo_bmp,
+                LOGO_WIDTH,
+                LOGO_HEIGHT,
+                1);
+            display.setTextSize(2); // Draw 2X-scale text
+            display.setCursor(10, 50);
+            display.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
+            Serial.println("Last Position: " + String(lastPosition));
+            Serial.println("");
+            display.display();
+            lastScreenSaver = millis();
           }
         }
         if (millis() > lastScreenSaver + 1000)
         {
           display.clearDisplay();
-          if (lastPosition <= (display.width() - LOGO_WIDTH))
+          if (lastPosition > 0 && lastPosition < (display.width() - LOGO_WIDTH))
           {
             display.drawBitmap(
                 lastPosition,
@@ -1333,8 +1389,8 @@ void mainUIDisplayTask(void *parameters)
                 1);
             display.setTextSize(2); // Draw 2X-scale text
             display.setCursor(10, 50);
-            display.println(String(timeinfo.tm_hour) + ":" + String(timeinfo.tm_min) + ":" + String(timeinfo.tm_sec));
-            lastPosition++;
+            display.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
+            lastPosition += 2;
             Serial.println("Last Position: " + String(lastPosition));
             Serial.println("");
             display.display();
@@ -1342,7 +1398,21 @@ void mainUIDisplayTask(void *parameters)
           }
           else
           {
-            lastPosition = 1;
+            lastPosition -= 2;
+            display.drawBitmap(
+                lastPosition,
+                2,
+                logo_bmp,
+                LOGO_WIDTH,
+                LOGO_HEIGHT,
+                1);
+            display.setTextSize(2); // Draw 2X-scale text
+            display.setCursor(10, 50);
+            display.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
+            Serial.println("Last Position: " + String(lastPosition));
+            Serial.println("");
+            display.display();
+            lastScreenSaver = millis();
           }
         }
       }
@@ -2274,46 +2344,49 @@ void updateRTC(void *parameters)
      * @brief Represents calendar time.
      *
      * The time_t type is used to represent the number of seconds elapsed since
-     * 00:00 hours, Jan 1, 1970 UTC (i.e., Unix epoch). It is typically used for
+     * 00:00 hours, Jan 1, 1970 UTC (i.e., UNIX epoch). It is typically used for
      * time-related functions and operations.
      */
 
     uint8_t nodeID = NODE_ID;
-    uint16_t timeZoneOffsetMessageID = UPDATE_TIMEZONE_OFFSET_MESSAGE_ID;
-    uint64_t timeZoneOffsetData;
+    // uint16_t timeZoneOffsetMessageID = UPDATE_TIMEZONE_OFFSET_MESSAGE_ID;
+    // uint64_t timeZoneOffsetData;
     uint64_t unixTimeData;
     Serial.println("");
     Serial.print("Get UNIX time from NTP server =");
-    time_t UNIXtime;
-    time(&UNIXtime);
-    unixTimeData = UNIXtime; //  Gets the unix time from the ntp server and stores it in the now variable
-    Serial.println(unixTimeData);
+    UNIXTime = time(NULL);
+    // tm *timeinfo = localtime(&UNIXTime);
+    Serial.println("UNIXTime" + String(UNIXTime));
+    // time(&UNIXtime);
+    unixTimeData = UNIXTime; //  Gets the unix time from the ntp server and stores it for the CAN Bus message
+    Serial.println("unixTimeData = " + String(unixTimeData));
     Serial.println("");
 
     // Add the current UNIX time to a messageID
 
-    Serial.println("New RTC Update");
-    getLocalTime(&timeinfo); // Get the current time from the ESP32 RTC
+    Serial.println("New RTC Update"); // Sets the timeinfo struct to the current local time
     Serial.print("tm Time struct timeinfo  ");
-    Serial.println(&timeinfo);
+    Serial.println(String(localtimeinfo->tm_hour) + ":" + String(localtimeinfo->tm_min) + ":" + String(localtimeinfo->tm_sec));
     Serial.println("");
 
 #ifdef DEBUGTime
     Serial.print("time_t UNIX timestamp now = ");
-    Serial.println(UNIXtime);
+    Serial.println(UNIXTime);
     Serial.println("");
 #endif
 
     // Set the current time to the ESP32 RTC
-    char buf_localTimeZone[8];
-    localTimeZone.toCharArray(buf_localTimeZone, 6);
-    Serial.println("Local Time Zone = " + String(buf_localTimeZone));
-    setenv("TZ", buf_localTimeZone, 1);
-    tzset();
-    localtime_r(&UNIXtime, &timeinfo);
-    strftime(localTime, sizeof(localTime), "%c", &timeinfo);
-    Serial.print("The current RTC date/time is: localTime = ");
-    Serial.println(localTime);
+    //    char buf_localTimeZone[8];
+    //    localTimeZone.toCharArray(buf_localTimeZone, 6);
+    //    Serial.println("Local Time Zone = " + String(buf_localTimeZone));
+    //    setenv("TZ", buf_localTimeZone, 1);
+    //    tzset();
+    // localtime_r(&UNIXtime, &timeinfo);
+    // strftime(timeinfo, sizeof(localTime), "%c", &timeinfo);
+    // Serial.print("The current RTC date/time is: localTime = ");
+    // Serial.println(localTime);
+
+    /*
     timeZoneOffsetData = localTimeZone.toInt();
 
     // Send the local time to the CAN Bus
@@ -2326,6 +2399,7 @@ void updateRTC(void *parameters)
     {
       Serial.println("Failed to queue message for transmission");
     }
+    */
 
     twai_message_t UNIXtimeMessage = core.create_message(UPDATE_UNIX_TIMESTAMP_MESSAGE_ID, nodeID, &unixTimeData);
     if (twai_transmit(&UNIXtimeMessage, 2000) == ESP_OK)
