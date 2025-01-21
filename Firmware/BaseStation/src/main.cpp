@@ -1242,7 +1242,7 @@ void mainUIDisplayTask(void *parameters)
           if (lastPosition < (display.width() - LOGO_WIDTH))
           {
             display.drawBitmap(
-                lastPosition,
+                timeinfo.tm_sec,
                 2,
                 logo_bmp,
                 LOGO_WIDTH,
@@ -1269,7 +1269,7 @@ void mainUIDisplayTask(void *parameters)
           if (lastPosition < (display.width() - LOGO_WIDTH))
           {
             display.drawBitmap(
-                lastPosition,
+                timeinfo.tm_sec,
                 2,
                 logo_bmp,
                 LOGO_WIDTH,
@@ -1299,7 +1299,7 @@ void mainUIDisplayTask(void *parameters)
           if (lastPosition < (display.width() - LOGO_WIDTH))
           {
             display.drawBitmap(
-                lastPosition,
+                timeinfo.tm_sec,
                 2,
                 logo_bmp,
                 LOGO_WIDTH,
@@ -1325,7 +1325,7 @@ void mainUIDisplayTask(void *parameters)
           if (lastPosition <= (display.width() - LOGO_WIDTH))
           {
             display.drawBitmap(
-                lastPosition,
+                timeinfo.tm_sec,
                 2,
                 logo_bmp,
                 LOGO_WIDTH,
