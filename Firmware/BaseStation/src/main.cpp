@@ -41,11 +41,12 @@ uint64_t isErrors;
 uint64_t isNoErrors;
 
 // Time
-int UnixTime; // Unix timestamp
-struct tm timeinfo;                                          // Time struct
-char localTime[64];                                          // Local time string
-int localTimeZoneOffset = 8;                                 // Timezone offset in hours
-String localTimeZone = "UTC+" + String(localTimeZoneOffset); // Default timezone is Pacific Time
+char localTime[64];          // Local time string
+String localTimeZone;        // "UTC+" + localTimeZoneOffset
+int localTimeZoneOffset = 8; // Timezone offset
+char buf_localTimeZone[8];   // Char array Buffer for timezone string
+struct tm timeinfo;
+time_t UNIXtime;
 
 // CAN Bus message IDs for warnings and alerts
 #define WARN_ID 0x384  // 900
@@ -2292,11 +2293,11 @@ void updateRTC(void *parameters)
     uint16_t timeZoneOffsetMessageID = UPDATE_TIMEZONE_OFFSET_MESSAGE_ID;
     uint64_t timeZoneOffsetData;
     uint64_t unixTimeData;
-    Serial.println("");
     Serial.print("Get UNIX time from NTP server =");
+    Serial.println("");
 
-    time_t UNIXtime;
-    UNIXtime = time(NULL);
+    time_t UNIXtime = time(NULL);
+    localtime_r(&UNIXtime, &timeinfo);   // Get the local time
     unixTimeData = (uint64_t)UNIXtime; //  Gets the unix time from the ntp server and stores it in the now variable
     Serial.println("unixTimeData = UNIXtime = " + String(unixTimeData));
     Serial.println("time_t UNIXtime = " + String(UNIXtime));
@@ -2305,8 +2306,6 @@ void updateRTC(void *parameters)
     // Add the current UNIX time to a messageID
 
     Serial.println("New RTC Update");
-
-    getLocalTime(&timeinfo); // already called in setup Get the current time from the ESP32 RTC
     Serial.println("Serial.println(timeinfo.tm_year)  " + String(timeinfo.tm_year));
     Serial.println(timeinfo.tm_year);
     Serial.println("String CtimeNow = ctime(&UNIXtime);");
@@ -2322,8 +2321,8 @@ void updateRTC(void *parameters)
 #endif
 
     // Set the current time to the ESP32 RTC
-    char buf_localTimeZone[6];
-    localTimeZone.toCharArray(buf_localTimeZone, 6);
+    buf_localTimeZone[8];
+    localTimeZone.toCharArray(buf_localTimeZone, 8);
     setenv("TZ", buf_localTimeZone, 1);
     tzset();
     localtime_r(&UNIXtime, &timeinfo);
@@ -2337,6 +2336,20 @@ void updateRTC(void *parameters)
     Serial.println("localTimeZoneOffset = " + String(localTimeZoneOffset));
     Serial.println("");
 
+    twai_message_t UNIXtimeMessage = core.create_message(updateUnixTimeMessageID, nodeID, &unixTimeData);
+    if (twai_transmit(&UNIXtimeMessage, 2000) == ESP_OK)
+    {
+      Serial.println("Sending UNIX Time Message, queued for transmission");
+      Serial.println("unixTimeData = " + String(unixTimeData));
+      Serial.println("");
+    }
+    else
+    {
+      Serial.println("Failed to Sending UNIX Time Message");
+    }
+
+    delay(1000);
+
     // Send the local time to the CAN Bus
     twai_message_t timeZoneOffsetMessage = core.create_message(timeZoneOffsetMessageID, nodeID, &timeZoneOffsetData);
     if (twai_transmit(&timeZoneOffsetMessage, 2000) == ESP_OK)
@@ -2348,17 +2361,7 @@ void updateRTC(void *parameters)
       Serial.println("Failed to Send Time Zone offset Message");
     }
 
-    twai_message_t UNIXtimeMessage = core.create_message(updateUnixTimeMessageID, nodeID, &unixTimeData);
-    if (twai_transmit(&UNIXtimeMessage, 2000) == ESP_OK)
-    {
-      Serial.println("Sending UNIX Time Message, queued for transmission");
-      Serial.println("unixTimeData = " + String(unixTimeData)); 
-      Serial.println("");
-    }
-    else
-    {
-      Serial.println("Failed to Sending UNIX Time Message");
-    }
+
   }
 }
 
