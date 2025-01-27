@@ -2386,7 +2386,7 @@ void updateRTC(void *parameters)
     // Serial.print("The current RTC date/time is: localTime = ");
     // Serial.println(localTime);
 
-    /*
+    
     timeZoneOffsetData = localTimeZone.toInt();
 
     // Send the local time to the CAN Bus
@@ -2399,7 +2399,7 @@ void updateRTC(void *parameters)
     {
       Serial.println("Failed to queue message for transmission");
     }
-    */
+    
 
     twai_message_t UNIXtimeMessage = core.create_message(UPDATE_UNIX_TIMESTAMP_MESSAGE_ID, nodeID, &unixTimeData);
     if (twai_transmit(&UNIXtimeMessage, 2000) == ESP_OK)

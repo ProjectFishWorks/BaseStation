@@ -23,7 +23,7 @@
 
 // #define DEBUG // Comment out to disable debug messages
 // #define DEBUG_BaseStationState // Comment out to disable debug messages
-#define DEBUGTime // Comment out to disable debug messages
+// #define DEBUGTime // Comment out to disable debug messages
 
 #define maxPWM 255 // Maximum PWM value for the LED
 
@@ -41,6 +41,7 @@ uint64_t isErrors;
 uint64_t isNoErrors;
 
 // Time
+int UnixTime; // Unix timestamp
 struct tm timeinfo;                                          // Time struct
 char localTime[64];                                          // Local time string
 int localTimeZoneOffset = 8;                                 // Timezone offset in hours
@@ -54,8 +55,8 @@ String localTimeZone = "UTC+" + String(localTimeZoneOffset); // Default timezone
 #define baseStationFirmwareVersion 0.01
 
 // TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
-#define systemID 0x00      // Leave
-#define baseStationID 0x04 // change for desired base station ID -> 0 = Sebastien Pacific Terrarium, 4 =Kayleb's test station, 3 = Kayleb's Reef
+#define SYSTEM_ID 0x00      // Leave
+#define BASESTATION_ID 0x04 // change for desired base station ID -> 0 = Sebastien Pacific Terrarium, 4 =Kayleb's test station, 3 = Kayleb's Reef
 
 // TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "projectfishworks.ca";
@@ -305,7 +306,7 @@ void setup() // ----------------------------------------------------------------
           ((display.height() / 4) + 2),
           logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
       display.setCursor(120, 54);
-      display.print(baseStationID);
+      display.print(BASESTATION_ID);
       display.display();
       delay(10);
     }
@@ -833,9 +834,9 @@ void MQTTConnect()
       Serial.println("connected");
       // Subscribe to the MQTT topic for this base station
 
-      String topicIn = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
-      String topicHistory = "historyIn/" + String(systemID) + "/" + String(baseStationID) + "/#";
-      String topicManifest = "manifestIn/" + String(systemID) + "/" + String(baseStationID);
+      String topicIn = "in/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID) + "/#";
+      String topicHistory = "historyIn/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID) + "/#";
+      String topicManifest = "manifestIn/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
 
       Serial.println("starting delay for mqtt");
       digitalWrite(11, HIGH);
@@ -854,7 +855,7 @@ void MQTTConnect()
         String manifestString = manifestFile.readString();
         manifestFile.close();
 
-        String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+        String topic = "manifestOut/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
 
         // Send the manifest data to the MQTT broker
         mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
@@ -872,7 +873,7 @@ void MQTTConnect()
         File manifestFile = SD.open(manifestFileName, FILE_READ);
         String manifestString = manifestFile.readString();
         manifestFile.close();
-        String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+        String topic = "manifestOut/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
 
         //Send the manifest data to the MQTT broker
         mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
@@ -973,16 +974,21 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
 
       if (nodeID == NODE_ID)
       {
+        uint8_t systemID = SYSTEM_ID;
+        uint8_t baseStationID = BASESTATION_ID;
+        uint16_t isErrorsMessageID = IS_ERRORS_MESSAGE_ID;
+        uint16_t isNoErrorsMessageID = IS_NO_ERRORS_MESSAGE_ID;
         Serial.println("MQQT Message received to self");
         Serial.println("");
         // Check for messages
         switch (messageID)
         {
         case LED_BRIGHTNESS_MESSAGE_ID:
-          Serial.println("LED Brightness message received");
           LEDBrightness = ((maxPWM / 100.0) * data);
           pixels.setBrightness(LEDBrightness);
           pixels.show();
+          Serial.println("LED Brightness message received");
+          Serial.println("");
           break;
 
         case RESET_ALERTS_MESSAGE_ID: // Reset alerts message--------------------------------------------------------------------------------------------
@@ -993,18 +999,17 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
           {
             alertQueue[i].isSilenced = 1;
           }
-          SendMQTTMessage(systemID, baseStationID, NODE_ID, IS_ERRORS_MESSAGE_ID, isErrors);
-          SendMQTTMessage(systemID, baseStationID, NODE_ID, IS_NO_ERRORS_MESSAGE_ID, isNoErrors);
-          Serial.println("");
+          SendMQTTMessage(systemID, baseStationID, nodeID, isErrorsMessageID, isErrors);
+          SendMQTTMessage(systemID, baseStationID, nodeID, isNoErrorsMessageID, isNoErrors);
           Serial.println("Alerts reset");
           Serial.println("");
           break;
 
         case UPDATE_TIMEZONE_OFFSET_MESSAGE_ID:
-          Serial.print("Update timezone message received offset= " + String(data));
-          Serial.println("");
           localTimeZoneOffset = data;
           localTimeZone = "UTC+" + String(localTimeZoneOffset);
+          Serial.print("Update timezone message received offset= " + String(data));
+          Serial.println("");
           break;
 
         default:
@@ -1036,7 +1041,7 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
 
       // Send the requested history data to the MQTT broker, data is the number of hours to read
       JsonDocument historyDoc;
-      sendLogData(systemID, baseStationID, nodeID, messageID, data, &mqttClient);
+      sendLogData(SYSTEM_ID, BASESTATION_ID, nodeID, messageID, data, &mqttClient);
     }
     else if (type == "manifestIn")
     {
@@ -1076,7 +1081,7 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
       // Send the manifest data to the MQTT broker
 
       Serial.println("Sending manifest data to MQTT");
-      String manifestTopic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+      String manifestTopic = "manifestOut/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
 
       mqttClient.publish(manifestTopic.c_str(), doc.as<String>().c_str(), true);
     }
@@ -1126,7 +1131,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
   Serial.println("Sending message to MQTT");
 
   // Create the MQTT topic string
-  String topic = "out/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID);
+  String topic = "out/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID) + "/" + String(nodeID) + "/" + String(messageID);
 
   // Allocate the JSON document
   JsonDocument doc;
@@ -1146,10 +1151,14 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
   // Check for alerts and warnings
   if (messageID == WARN_ID || messageID == ALERT_ID)
   {
+    uint8_t systemID = SYSTEM_ID;
+    uint8_t baseStationID = BASESTATION_ID;
+    uint16_t isErrorsMessageID = IS_ERRORS_MESSAGE_ID;
+    uint16_t isNoErrorsMessageID = IS_NO_ERRORS_MESSAGE_ID;
     isErrors = 1;
     isNoErrors = 0;
-    SendMQTTMessage(systemID, baseStationID, NODE_ID, IS_ERRORS_MESSAGE_ID, isErrors);
-    SendMQTTMessage(systemID, baseStationID, NODE_ID, IS_NO_ERRORS_MESSAGE_ID, isNoErrors);
+    SendMQTTMessage(systemID, baseStationID, nodeID, isErrorsMessageID, isErrors);
+    SendMQTTMessage(systemID, baseStationID, nodeID, isNoErrorsMessageID, isNoErrors);
     Serial.println("");
     Serial.println("Error message sent");
     Serial.println("");
@@ -1197,7 +1206,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
   if (logMessage)
   {
     Serial.println("Logging message");
-    writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+    writeLogData(SYSTEM_ID, BASESTATION_ID, String(baseStationFirmwareVersion), nodeID, messageID, data);
   }
   else
   {
@@ -1522,7 +1531,7 @@ void mainUIDisplayTask(void *parameters)
         display.setTextSize(1); // Draw 1X-scale text
         display.setCursor(10, 17);
         display.print(F("Base Station ID:"));
-        display.println(baseStationID);
+        display.println(BASESTATION_ID);
         display.setCursor(10, 27);
         display.print(F("Current WiFi:"));
         display.setCursor(10, 37);
@@ -2279,23 +2288,31 @@ void updateRTC(void *parameters)
      */
 
     uint8_t nodeID = NODE_ID;
+    uint16_t updateUnixTimeMessageID = UPDATE_UNIX_TIMESTAMP_MESSAGE_ID;
     uint16_t timeZoneOffsetMessageID = UPDATE_TIMEZONE_OFFSET_MESSAGE_ID;
     uint64_t timeZoneOffsetData;
     uint64_t unixTimeData;
     Serial.println("");
     Serial.print("Get UNIX time from NTP server =");
+
     time_t UNIXtime;
-    time(&UNIXtime);
-    unixTimeData = UNIXtime; //  Gets the unix time from the ntp server and stores it in the now variable
-    Serial.println(unixTimeData);
+    UNIXtime = time(NULL);
+    unixTimeData = (int)UNIXtime; //  Gets the unix time from the ntp server and stores it in the now variable
+    Serial.println("unixTimeData = UNIXtime; = " + String(unixTimeData));
+    Serial.println("time_t UNIXtime = " + String(UNIXtime));
     Serial.println("");
 
     // Add the current UNIX time to a messageID
 
     Serial.println("New RTC Update");
-    getLocalTime(&timeinfo); // Get the current time from the ESP32 RTC
-    Serial.print("tm Time struct timeinfo  ");
-    Serial.println(&timeinfo);
+
+    getLocalTime(&timeinfo); // already called in setup Get the current time from the ESP32 RTC
+    Serial.println("Serial.println(timeinfo.tm_year)  " + String(timeinfo.tm_year));
+    Serial.println(timeinfo.tm_year);
+    Serial.println("String CtimeNow = ctime(&UNIXtime);");
+    String CtimeNow = ctime(&UNIXtime);
+    Serial.println(CtimeNow);
+    // Serial.println(String(timeinfo.tm_mon) +  &timeinfo.tm_mday, &timeinfo.tm_year, &timeinfo.tm_hour, &timeinfo.tm_min, &timeinfo.tm_sec);
     Serial.println("");
 
 #ifdef DEBUGTime
@@ -2305,39 +2322,41 @@ void updateRTC(void *parameters)
 #endif
 
     // Set the current time to the ESP32 RTC
-    char buf_localTimeZone[8];
+    char buf_localTimeZone[6];
     localTimeZone.toCharArray(buf_localTimeZone, 6);
-    Serial.println("Local Time Zone = " + String(buf_localTimeZone));
     setenv("TZ", buf_localTimeZone, 1);
     tzset();
     localtime_r(&UNIXtime, &timeinfo);
     strftime(localTime, sizeof(localTime), "%c", &timeinfo);
-    Serial.print("The current RTC date/time is: localTime = ");
-    Serial.println(localTime);
-    timeZoneOffsetData = localTimeZone.toInt();
+    Serial.print("Serial.println(&timeinfo) = ");
+    Serial.println(&timeinfo);
+    timeZoneOffsetData = localTimeZoneOffset;
+    Serial.println("timeZoneOffsetData = localTimeZoneOffset; = " + String(timeZoneOffsetData));
+    Serial.println("localTime = " + String(localTime));
+    Serial.println("localTimeZone = " + String(localTimeZone));
+    Serial.println("localTimeZoneOffset = " + String(localTimeZoneOffset));
+    Serial.println("");
 
     // Send the local time to the CAN Bus
-    twai_message_t timZoneOffsetMessage = core.create_message(timeZoneOffsetMessageID, nodeID, &timeZoneOffsetData);
-    if (twai_transmit(&timZoneOffsetMessage, 2000) == ESP_OK)
+    twai_message_t timeZoneOffsetMessage = core.create_message(timeZoneOffsetMessageID, nodeID, &timeZoneOffsetData);
+    if (twai_transmit(&timeZoneOffsetMessage, 2000) == ESP_OK)
     {
-      Serial.println("Local Time offset Message queued for transmission");
+      Serial.println("Sending Time Zone offset Message, queued for transmission");
     }
     else
     {
-      Serial.println("Failed to queue message for transmission");
+      Serial.println("Failed to Send Time Zone offset Message");
     }
 
-    twai_message_t UNIXtimeMessage = core.create_message(UPDATE_UNIX_TIMESTAMP_MESSAGE_ID, nodeID, &unixTimeData);
+    twai_message_t UNIXtimeMessage = core.create_message(updateUnixTimeMessageID, nodeID, &unixTimeData);
     if (twai_transmit(&UNIXtimeMessage, 2000) == ESP_OK)
     {
-      Serial.println("UNIX Time Message queued for transmission");
+      Serial.println("Sending UNIX Time Message, queued for transmission");
     }
     else
     {
-      Serial.println("Failed to queue message for transmission");
+      Serial.println("Failed to Sending UNIX Time Message");
     }
-
-    delay(1000);
   }
 }
 
@@ -2345,7 +2364,7 @@ void SendMQTTMessage(uint8_t _systemID, uint8_t _baseStationID, uint8_t _nodeID,
 {
 
   // Create the MQTT topic string
-  String topic = "out/" + String(systemID) + "/" + String(_baseStationID) + "/" + String(_nodeID) + "/" + String(_messageID);
+  String topic = "out/" + String(_systemID) + "/" + String(_baseStationID) + "/" + String(_nodeID) + "/" + String(_messageID);
 
   // Allocate the JSON document
   JsonDocument doc;
