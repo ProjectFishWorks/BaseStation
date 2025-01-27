@@ -984,7 +984,7 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
         switch (messageID)
         {
         case LED_BRIGHTNESS_MESSAGE_ID:
-          LEDBrightness = ((maxPWM / 100.0) * data);
+          LEDBrightness = ((maxPWM / 100.0) * (int)data);
           pixels.setBrightness(LEDBrightness);
           pixels.show();
           Serial.println("LED Brightness message received");
@@ -1006,7 +1006,7 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
           break;
 
         case UPDATE_TIMEZONE_OFFSET_MESSAGE_ID:
-          localTimeZoneOffset = data;
+          localTimeZoneOffset = (int)data;
           localTimeZone = "UTC+" + String(localTimeZoneOffset);
           Serial.print("Update timezone message received offset= " + String(data));
           Serial.println("");
@@ -2297,8 +2297,8 @@ void updateRTC(void *parameters)
 
     time_t UNIXtime;
     UNIXtime = time(NULL);
-    unixTimeData = (int)UNIXtime; //  Gets the unix time from the ntp server and stores it in the now variable
-    Serial.println("unixTimeData = UNIXtime; = " + String(unixTimeData));
+    unixTimeData = (uint64_t)UNIXtime; //  Gets the unix time from the ntp server and stores it in the now variable
+    Serial.println("unixTimeData = UNIXtime = " + String(unixTimeData));
     Serial.println("time_t UNIXtime = " + String(UNIXtime));
     Serial.println("");
 
@@ -2330,8 +2330,8 @@ void updateRTC(void *parameters)
     strftime(localTime, sizeof(localTime), "%c", &timeinfo);
     Serial.print("Serial.println(&timeinfo) = ");
     Serial.println(&timeinfo);
-    timeZoneOffsetData = localTimeZoneOffset;
-    Serial.println("timeZoneOffsetData = localTimeZoneOffset; = " + String(timeZoneOffsetData));
+    timeZoneOffsetData = (int)localTimeZoneOffset;
+    Serial.println("timeZoneOffsetData = localTimeZoneOffset = " + String(timeZoneOffsetData));
     Serial.println("localTime = " + String(localTime));
     Serial.println("localTimeZone = " + String(localTimeZone));
     Serial.println("localTimeZoneOffset = " + String(localTimeZoneOffset));
@@ -2352,6 +2352,8 @@ void updateRTC(void *parameters)
     if (twai_transmit(&UNIXtimeMessage, 2000) == ESP_OK)
     {
       Serial.println("Sending UNIX Time Message, queued for transmission");
+      Serial.println("unixTimeData = " + String(unixTimeData)); 
+      Serial.println("");
     }
     else
     {
