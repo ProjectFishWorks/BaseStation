@@ -722,7 +722,7 @@ void setup() // ----------------------------------------------------------------
 
 void loop() //---------------------------------------------------Loop-----------------------------------------------------------------------------
 {
-
+delay(100);
   emailClientLoop(email_recipient, email_recipient_name);
 
   // Go to screen saver after 5 seconds should no button be pressed
@@ -913,6 +913,7 @@ void MQTTdisconnect()
 
 void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Callback function for MQTT messages----------------------------------------------
 {
+  delay(100);
   /*   Serial.print("Message arrived [");
     Serial.print(topic);
     Serial.print("] ");
@@ -1001,7 +1002,9 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
             alertQueue[i].isSilenced = 1;
           }
           SendMQTTMessage(systemID, baseStationID, nodeID, isErrorsMessageID, isErrors);
+          delay(100);
           SendMQTTMessage(systemID, baseStationID, nodeID, isNoErrorsMessageID, isNoErrors);
+          delay(100);
           Serial.println("Alerts reset");
           Serial.println("");
           break;
@@ -1030,6 +1033,8 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
       {
         Serial.println("Test Failed to queue message for transmission");
       }
+
+      delay(100);
 
       // Log the message to the SD card
       // mqttClient.loop();
@@ -1128,6 +1133,7 @@ void testCurrentSense()
 // Function that is called when a CAN Bus message is received
 void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessage, uint64_t data)
 {
+  delay(100);
   Serial.println("Message received callback");
   Serial.println("Sending message to MQTT");
 
@@ -1159,7 +1165,9 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
     isErrors = 1;
     isNoErrors = 0;
     SendMQTTMessage(systemID, baseStationID, nodeID, isErrorsMessageID, isErrors);
+    delay(100);
     SendMQTTMessage(systemID, baseStationID, nodeID, isNoErrorsMessageID, isNoErrors);
+    delay(1000);
     Serial.println("");
     Serial.println("Error message sent");
     Serial.println("");
@@ -2367,7 +2375,7 @@ void updateRTC(void *parameters)
 
 void SendMQTTMessage(uint8_t _systemID, uint8_t _baseStationID, uint8_t _nodeID, uint16_t _messageID, uint64_t _data)
 {
-
+delay(1000);
   // Create the MQTT topic string
   String topic = "out/" + String(_systemID) + "/" + String(_baseStationID) + "/" + String(_nodeID) + "/" + String(_messageID);
 
