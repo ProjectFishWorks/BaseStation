@@ -36,7 +36,7 @@ void getLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, u
 //Get the current log file name based on the current time
 void getCurrentLogFilename(char* filename, uint16_t systemID, uint16_t baseStationID, uint16_t messageID);
 
-void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, PubSubClient* client);
+void sendLogData(String userID, uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, PubSubClient* client);
 
 //Write the log file header
 void writeLogHeader(File *file, uint16_t systemID, uint16_t baseStationID, uint16_t messageID, String baseStationFirmwareVersion);

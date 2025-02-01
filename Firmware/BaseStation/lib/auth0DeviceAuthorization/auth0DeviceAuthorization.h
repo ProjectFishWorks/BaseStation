@@ -7,6 +7,10 @@
 #include "mqttLogin.h"
 #include "ArduinoJson.h"
 
+#include "mbedtls/base64.h"
+
+#define TOKEN_FILE "/mqtt-token.json"
+
 class Auth0DeviceAuthorization : public DeviceAuthorization {
 public:
     Auth0DeviceAuthorization() = default;
@@ -14,13 +18,13 @@ public:
 
     MQTTLogin getMQTTLogin(uint8_t forceNewLogin = false) override;
 
+    String getUserID();
+
     //Code to run when the user is required to login on a external device
     std::function<void(const char* url, const char* code)> verificationCallback;
 
 
 private:
-
-    void requestDeviceCode(String baseURL, String clientId, String audience);
 
 };
 

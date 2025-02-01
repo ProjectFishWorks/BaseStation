@@ -2,6 +2,8 @@
 #include <HTTPClient.h>
 #include <LittleFS.h>
 
+#include "JWT_RS256.h"
+
 
 MQTTLogin Auth0DeviceAuthorization::getMQTTLogin(uint8_t forceNewLogin) {
     String baseURL = "https://dev-xk74bsamhi6vyn3g.ca.auth0.com";
@@ -10,8 +12,8 @@ MQTTLogin Auth0DeviceAuthorization::getMQTTLogin(uint8_t forceNewLogin) {
 
     Serial.println("Checking for token file");
     //Check if the token file exists
-    if(LittleFS.exists("/mqtt-token.json") && !forceNewLogin){
-        File tokenFile = LittleFS.open("/mqtt-token.json", "r");
+    if(LittleFS.exists(TOKEN_FILE) && !forceNewLogin){
+        File tokenFile = LittleFS.open(TOKEN_FILE, "r");
         String tokenString = tokenFile.readString();
         tokenFile.close();
 
@@ -70,9 +72,9 @@ MQTTLogin Auth0DeviceAuthorization::getMQTTLogin(uint8_t forceNewLogin) {
                 tokenDoc["expires_at"] = now + newTokenDoc["expires_in"].as<int>();
                 tokenDoc["access_token"] = newTokenDoc["access_token"];
 
-                LittleFS.remove("/mqtt-token.json");
+                LittleFS.remove(TOKEN_FILE);
 
-                File tokenFile = LittleFS.open("/mqtt-token.json", "w");
+                File tokenFile = LittleFS.open(TOKEN_FILE, "w");
                 tokenFile.print(tokenDoc.as<String>());
                 tokenFile.close();
 
@@ -190,11 +192,11 @@ MQTTLogin Auth0DeviceAuthorization::getMQTTLogin(uint8_t forceNewLogin) {
         //Write the token document to the token file
         Serial.println("Writing token to file");
 
-        if(LittleFS.exists("/mqtt-token.json")){
-            LittleFS.remove("/mqtt-token.json");
+        if(LittleFS.exists(TOKEN_FILE)){
+            LittleFS.remove(TOKEN_FILE);
         }
 
-        File tokenFile = LittleFS.open("/mqtt-token.json", "w");
+        File tokenFile = LittleFS.open(TOKEN_FILE, "w");
         tokenFile.print(tokenDoc.as<String>());
         tokenFile.close();
 
@@ -213,10 +215,87 @@ MQTTLogin Auth0DeviceAuthorization::getMQTTLogin(uint8_t forceNewLogin) {
 
 }
 
-void Auth0DeviceAuthorization::requestDeviceCode(String baseURL, String clientId, String audience) {
+String Auth0DeviceAuthorization::getUserID() {
 
-    
+    if(LittleFS.exists(TOKEN_FILE)){
+        File tokenFile = LittleFS.open(TOKEN_FILE, "r");
+        String tokenString = tokenFile.readString();
+        tokenFile.close();
+
+        JsonDocument tokenDoc;
+
+        DeserializationError error = deserializeJson(tokenDoc, tokenString);
+
+        if (error) {
+            Serial.print(F("token deserializeJson() failed: "));
+            Serial.println(error.f_str());
+            return "";
+        }
+
+        Serial.println("Parsing token");
+
+        const char* rsa_public_key = "-----BEGIN PUBLIC KEY-----\nMIIDHTCCAgWgAwIBAgIJIo+aXdGh5cv+MA0GCSqGSIb3DQEBCwUAMCwxKjAoBgNVBAMTIWRldi14azc0YnNhbWhpNnZ5bjNnLmNhLmF1dGgwLmNvbTAeFw0yNTAxMDkwNTM3MTdaFw0zODA5MTgwNTM3MTdaMCwxKjAoBgNVBAMTIWRldi14azc0YnNhbWhpNnZ5bjNnLmNhLmF1dGgwLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMNGitWlzThJml941EslLw09Bd2cUsBXF+JSA39b28NGAElR46mnWyVPHBtkQrPojYG8pbQ6BZU45eUZHN0Vj+VYkCSEpAHlIK5pGbsAZQDqPxfk2bzyw6Aoe81peOyZXh3s/q/Qn6WOGOEaX/hrmyEECSAPf9XVpZGIIz6WAWzo6dz/UPrFe/3EPa2YfStoyeESmWs0mLbpGkihawbRmQ6ZzePqgueA013F3dHwiPxcUrkYOxb0UZYDUfZIg9k1hvo5dbGn0WAky/YLarp+4C9053a9SbuMeL1ogG7u/h8Zx3FEEvZah6gSVdXBgNMqIDwamZShcUvX75hxwoXSHwcCAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUSXpUrOo+t1rZnZldZyt3cPXvhqMwDgYDVR0PAQH/BAQDAgKEMA0GCSqGSIb3DQEBCwUAA4IBAQCareAd3qXNEUvodffTCpEZnHRDNfLFPv6ed1H5JkxKb1Y7aAt0tLGFWIa5D/Mx+00MYAzUOFTWjqIapVY1MxAvYze87UJ3JMqt7fFo8YOBG2AbKZx+FvGZ4/+Ou0oBAhcbxbaeO3Td8nPdGxDowwlN5m9MJRaNMC3q5EeFIVshtUuhiQWLRDd7k1oYEJ4U0SIqsz2ON6/x5pXnZA4+mistE4JDIoOsZLwfe5CD/U99PW1yAhTafeXrn5XocmktbKLUoGpiZVS0nlg53u+WHyPEFOdsCBPP9YJ7AH/GBdG5EXJM0B8VlbBpk+fhas+uaryjp73NW2SrtMLOdTUP38hi\n-----END PUBLIC KEY-----";
+
+        JWT_RS256 jwt;
+
+        jwt.rsa_public_key = rsa_public_key;
+
+        Serial.println("Not verifying signature - implement this later");
+        // bool isValid = jwt.tokenIsValid(tokenDoc["access_token"].as<String>());
+
+        // if (isValid) {
+        //     Serial.println("Token is valid!");
+        // } else {
+        //     Serial.println("Token is invalid.");
+        // }
+
+        ParsedToken parsedToken = jwt.parseToken(tokenDoc["access_token"].as<String>());
+
+        Serial.println("Payload:");
+        Serial.println(parsedToken.payload);
+
+        JsonDocument jwtDoc;
+
+        DeserializationError jwtError = deserializeJson(jwtDoc, parsedToken.payload);
+
+        if (jwtError) {
+            Serial.print(F("jwt deserializeJson() failed: "));
+            Serial.println(jwtError.f_str());
+            return "";
+        }
+
+        Serial.print("Sub:");
+        Serial.println(jwtDoc["sub"].as<String>());
+
+        return jwtDoc["sub"].as<String>();
+
+        // unsigned char token[1024];
+        // unsigned char tokenStringChar[2048];
+
+        // strcpy((char*)token, tokenDoc["access_token"].as<String>().c_str());
+
+        // Serial.println("Token:");
+
+        // Serial.println(mbedtls_base64_decode(tokenStringChar, 2048, NULL, token, 20));
 
 
+        // JsonDocument jwtDoc;
 
+        // DeserializationError jwtError = deserializeJson(jwtDoc, tokenStringChar);
+
+        // if (jwtError) {
+        //     Serial.print(F("jwt deserializeJson() failed: "));
+        //     Serial.println(jwtError.f_str());
+        //     return "";
+        // }
+
+        // Serial.print("Payload:");
+        // Serial.println(jwtDoc.as<String>()); 
+        
+        // return jwtDoc["sub"].as<String>();
+
+    }
+
+    Serial.println("No token file found");
+    return "";
 }

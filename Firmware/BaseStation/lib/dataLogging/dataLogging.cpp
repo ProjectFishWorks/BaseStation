@@ -68,7 +68,7 @@ void writeLogData(uint16_t systemID, uint16_t baseStationID, String baseStationF
 }
 
 //Send log data to the MQTT broker
-void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, PubSubClient* client){
+void sendLogData(String userID, uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint16_t messageID, uint16_t hoursToRead, PubSubClient* client){
 
   //Allocate the JSON document
   JsonDocument doc;
@@ -96,7 +96,7 @@ void sendLogData(uint16_t systemID, uint16_t baseStationID, uint8_t nodeID, uint
     //Format the data/time
     strftime(timeString, 255, "%Y%m%d%H", &hour);
 
-    String topic = "historyOut/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID) + "/" + timeString;
+    String topic = userID + "/historyOut/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID) + "/" + timeString;
     Serial.println("Sending log data to MQTT topic: " + topic);
     client->publish(topic.c_str(), doc.as<String>().c_str());
 

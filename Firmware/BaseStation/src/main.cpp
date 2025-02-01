@@ -55,6 +55,8 @@ char email_recipient_name[255] = "Kayleb Stetsko";
 
 MQTTLogin mqttLogin;
 
+String userID;
+
 TaskHandle_t xMQTTloop = NULL;
 
 // Time
@@ -240,7 +242,7 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
   Serial.println("Sending message to MQTT");
 
   // Create the MQTT topic string
-  String topic = "out/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID);
+  String topic = userID + "/out/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID);
 
   // Allocate the JSON document
   JsonDocument doc;
@@ -342,9 +344,12 @@ void MQTTConnect()
       Serial.println("connected");
       // Subscribe to the MQTT topic for this base station
 
-      String topicIn = "in/" + String(systemID) + "/" + String(baseStationID) + "/#";
-      String topicHistory = "historyIn/" + String(systemID) + "/" + String(baseStationID) + "/#";
-      String topicManifest = "manifestIn/" + String(systemID) + "/" + String(baseStationID);
+      userID = auth0DeviceAuthorization.getUserID();
+      Serial.println("UserID: " + userID);
+
+      String topicIn = userID + "/in/" + String(systemID) + "/" + String(baseStationID) + "/#";
+      String topicHistory = userID + "/historyIn/" + String(systemID) + "/" + String(baseStationID) + "/#";
+      String topicManifest = userID + "/manifestIn/" + String(systemID) + "/" + String(baseStationID);
 
       Serial.println("starting delay for mqtt");
       digitalWrite(11, HIGH);
@@ -363,7 +368,7 @@ void MQTTConnect()
         String manifestString = manifestFile.readString();
         manifestFile.close();
 
-        String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+        String topic = userID + "/manifestOut/" + String(systemID) + "/" + String(baseStationID);
 
         // Send the manifest data to the MQTT broker
         mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
@@ -419,11 +424,13 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length)
     Serial.println(); */
 
   // Parse the topic to get the node ID and message ID with the format:
-  //  in/systemID/baseStationID/nodeID/messageID/
+  //  userID/in/systemID/baseStationID/nodeID/messageID/
   String topicString = String(topic);
   int index = 0;
   index = topicString.indexOf("/", index);
-  String type = topicString.substring(0, index);
+  index = topicString.indexOf("/", index);
+  String type = topicString.substring(index + 1, topicString.indexOf("/", index + 1));
+  index = topicString.indexOf("/", index + 1);
   index = topicString.indexOf("/", index + 1);
   index = topicString.indexOf("/", index + 1);
   int nodeID = topicString.substring(index + 1, topicString.indexOf("/", index + 1)).toInt();
@@ -521,7 +528,7 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length)
 
       // Send the requested history data to the MQTT broker, data is the number of hours to read
       JsonDocument historyDoc;
-      sendLogData(systemID, baseStationID, nodeID, messageID, data, &mqttClient);
+      sendLogData(userID, systemID, baseStationID, nodeID, messageID, data, &mqttClient);
     }
     else if (type == "manifestIn")
     {
@@ -561,7 +568,7 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length)
       // Send the manifest data to the MQTT broker
 
       Serial.println("Sending manifest data to MQTT");
-      String manifestTopic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+      String manifestTopic = userID + "/manifestOut/" + String(systemID) + "/" + String(baseStationID);
 
       mqttClient.publish(manifestTopic.c_str(), doc.as<String>().c_str(), true);
     }
