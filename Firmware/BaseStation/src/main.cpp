@@ -43,12 +43,13 @@ uint64_t isErrors;
 uint64_t isNoErrors;
 
 // Time
-char localTime[64];               // Local time string
-String localTimeZone;             // "UTC+" + localTimeZoneOffset
-uint64_t localTimeZoneOffset = 8; // Timezone offset
-char buf_localTimeZone[8];        // Char array Buffer for timezone string
+char localTime[64];                                  // Local time string
+uint64_t localTimeZoneOffset = 8;                    // Timezone offset
+String localTimeZone = "UTC+" + localTimeZoneOffset; // Timezone string
+char buf_localTimeZone[8];                           // Char array Buffer for timezone string
 struct tm timeinfo;
 time_t UNIXtime;
+uint64_t lastRTCUpdate = millis();
 
 // CAN Bus message IDs for warnings and alerts
 #define WARN_ID 0x384  // 900
@@ -249,6 +250,7 @@ void handleInternalMessage(int messageID, uint64_t data);
 void resetAlerts();
 void handleHistoryMessage(int nodeID, int messageID, uint64_t data);
 void handleManifestMessage(JsonDocument &doc, byte *payload, unsigned int length);
+void sendTimezoneOffsetMessage(uint64_t data);
 
 void setup() // ------------------------------------------------------------------------------------------------------------------------------------
 {
@@ -625,6 +627,13 @@ void setup() // ----------------------------------------------------------------
   // For some reason if I don't include a call to getLocalTime here, the time is not set correctly and we get hour values of larger than 24
   struct tm timeinfo;
   getLocalTime(&timeinfo);
+  time_t UNIXtime = time(NULL);
+  localTimeZone = ("UTC+" + String(localTimeZoneOffset));
+  localTimeZone.toCharArray(buf_localTimeZone, 8);
+  setenv("TZ", buf_localTimeZone, 1);
+  tzset();
+  localtime_r(&UNIXtime, &timeinfo);
+  strftime(localTime, sizeof(localTime), "%c", &timeinfo);
 
   // TODO: is this were we should start the Node Controller Core?
   //  Start the Node Controller
@@ -993,7 +1002,13 @@ void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Cal
     {
       // Create a CAN Bus message
       twai_message_t message = core.create_message(messageID, nodeID, &data);
-      if (twai_transmit(&message, 2000) == ESP_OK)
+      Serial.print("Transmitting CAN Bus message to Node ID: ");
+      Serial.print(nodeID);
+      Serial.print(" Message ID: ");
+      Serial.print(messageID);
+      Serial.print(" Data: ");
+      Serial.println(data);
+      if (twai_transmit(&message, 2000) == ESP_OK)  
       {
         Serial.println("Test Message queued for transmission");
       }
@@ -1056,11 +1071,8 @@ void handleInternalMessage(int messageID, uint64_t data)
 
   case UPDATE_TIMEZONE_OFFSET_MESSAGE_ID:
     localTimeZoneOffset = data;
-    localTimeZone = ("UTC+" + String(localTimeZoneOffset));
-    Serial.println("Update timezone message received, offset = " + String(data));
-    Serial.println("localTimeZoneOffset = %s localTimeZone = %s" + String(localTimeZoneOffset) + String(localTimeZone));
-    Serial.println("");
-
+    localTimeZone = ("UTC+" + String(data));
+    sendTimezoneOffsetMessage(data);
     break;
 
   default:
@@ -1068,6 +1080,23 @@ void handleInternalMessage(int messageID, uint64_t data)
     break;
   }
   Serial.println("");
+}
+
+void sendTimezoneOffsetMessage(uint64_t data)
+{
+  Serial.println("Running void sendTimezoneOffsetMessage(uint64_t data)");
+  twai_message_t timeZoneOffsetMessage = core.create_message(UPDATE_TIMEZONE_OFFSET_MESSAGE_ID, NODE_ID, &data);
+  if (twai_transmit(&timeZoneOffsetMessage, 2000) == ESP_OK)
+  {
+    Serial.println("Sending Time Zone offset Message, queued for transmission");
+    Serial.println("localTimeZoneOffset = " + String(localTimeZoneOffset));
+    Serial.println("");
+  }
+  else
+  {
+    Serial.println("Failed to Send Time Zone offset Message");
+    Serial.println("");
+  }
 }
 
 // Function to send a message to the MQTT broker
@@ -1130,7 +1159,10 @@ void handleManifestMessage(JsonDocument &doc, byte *payload, unsigned int length
   Serial.println("");
 }
 
-/*
+/*----------------------------------------------Original function pre compartmetalization--------------------------------------------------------------
+
+
+
 void receivedMQTTMessage(char *topic, byte *payload, unsigned int length) // Callback function for MQTT messages----------------------------------------------
 {
   /*   Serial.print("Message arrived [");
@@ -1524,7 +1556,6 @@ void mainUIDisplayTask(void *parameters)
             Serial.println("Last Position: " + String(lastPosition));
             Serial.println("");
 #endif
-
           }
           else
           {
@@ -2546,7 +2577,7 @@ void updateRTC(void *parameters)
   while (1)
   {
     Serial.println("Running void updateRTC(void *parameters)");
-    delay(10000);
+    delay(1000);
     // Time--------------------------------------------------------------------------------------
 
     // Globals for time
@@ -2562,13 +2593,8 @@ void updateRTC(void *parameters)
      * time-related functions and operations.
      */
 
-    uint8_t nodeID = NODE_ID;
-    uint16_t updateUnixTimeMessageID = UPDATE_UNIX_TIMESTAMP_MESSAGE_ID;
-    uint16_t timeZoneOffsetMessageID = UPDATE_TIMEZONE_OFFSET_MESSAGE_ID;
-    uint64_t timeZoneOffsetData;
     uint64_t unixTimeData;
     time_t UNIXtime = time(NULL);
-    localtime_r(&UNIXtime, &timeinfo); // Get the local time
     unixTimeData = (uint64_t)UNIXtime; //  Gets the unix time from the ntp server and stores it in the now variable
     localTimeZone = ("UTC+" + String(localTimeZoneOffset));
     localTimeZone.toCharArray(buf_localTimeZone, 8);
@@ -2576,7 +2602,6 @@ void updateRTC(void *parameters)
     tzset();
     localtime_r(&UNIXtime, &timeinfo);
     strftime(localTime, sizeof(localTime), "%c", &timeinfo);
-    timeZoneOffsetData = (int)localTimeZoneOffset;
 
 #ifdef DEBUGTime
     Serial.println("Get UNIX time from NTP server =");
@@ -2597,37 +2622,24 @@ void updateRTC(void *parameters)
     Serial.println("localTimeZoneOffset = " + String(localTimeZoneOffset));
     Serial.println("");
 #endif
-
-    twai_message_t UNIXtimeMessage = core.create_message(updateUnixTimeMessageID, nodeID, &unixTimeData);
-    if (twai_transmit(&UNIXtimeMessage, 2000) == ESP_OK)
+    if (millis() > lastRTCUpdate + 10000)
     {
-      Serial.println("Sending UNIX Time Message, queued for transmission");
-      Serial.println("unixTimeData = " + String(unixTimeData));
-      Serial.println("");
-    }
-    else
-    {
-      Serial.println("Failed to Sending UNIX Time Message");
-      Serial.println("");
-    }
-
-    delay(100);
-
-    // Send the local time to the CAN Bus
-    twai_message_t timeZoneOffsetMessage = core.create_message(timeZoneOffsetMessageID, nodeID, &timeZoneOffsetData);
-    if (twai_transmit(&timeZoneOffsetMessage, 2000) == ESP_OK)
-    {
-      Serial.println("Sending Time Zone offset Message, queued for transmission");
-      Serial.println("timeZoneOffsetData = " + String(timeZoneOffsetData));
-      Serial.println("");
-    }
-    else
-    {
-      Serial.println("Failed to Send Time Zone offset Message");
-      Serial.println("");
+      twai_message_t UNIXtimeMessage = core.create_message(UPDATE_UNIX_TIMESTAMP_MESSAGE_ID, NODE_ID, &unixTimeData);
+      if (twai_transmit(&UNIXtimeMessage, 2000) == ESP_OK)
+      {
+        Serial.println("Sending UNIX Time Message, queued for transmission");
+        Serial.println("unixTimeData = " + String(unixTimeData));
+        Serial.println("");
+      }
+      else
+      {
+        Serial.println("Failed to Sending UNIX Time Message");
+        Serial.println("");
+      }
+      sendTimezoneOffsetMessage(localTimeZoneOffset);
+      lastRTCUpdate = millis();
     }
   }
-  Serial.println("");
 }
 
 void SendMQTTMessage(uint8_t _systemID, uint8_t _baseStationID, uint8_t _nodeID, uint16_t _messageID, uint64_t _data)
