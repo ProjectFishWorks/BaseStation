@@ -1274,7 +1274,7 @@ void handleManifestMessage(JsonDocument &doc, byte *payload, unsigned int length
   }
 
   Serial.println("Sending manifest data to MQTT");
-  String topicManifest = userID + "/manifestOut/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
+  String manifestTopic = userID + "/manifestOut/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
   mqttClient.publish(manifestTopic.c_str(), doc.as<String>().c_str(), true);
   Serial.println("Manifest data sent to MQTT");
   Serial.println("");
