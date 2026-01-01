@@ -19,6 +19,10 @@
 #include <LittleFS.h>
 #include <time.h>
 
+#include "deviceAuthorization.h"
+#include "auth0DeviceAuthorization.h"
+#include "mqttLogin.h"
+
 // Constants-----------------------------------------------------------------------------------------------------------------------
 
 // #define DEBUG // Comment out to disable debug messages
@@ -72,6 +76,10 @@ char mqtt_password[255] = "F1shworks!";
 
 char email_recipient[255] = "kayleb_s@hotmail.com";
 char email_recipient_name[255] = "Kayleb Stetsko";
+
+MQTTLogin mqttLogin;
+
+String userID;
 
 TaskHandle_t xMQTTloop = NULL;
 
@@ -237,6 +245,388 @@ void mqttLoop(void *_this);
 void neoPixelTask(void *parameters);
 void mainUIDisplayTask(void *parameters);
 void sendWarningToQueue();
+
+//Authrise the device
+
+DeviceAuthorization* deviceAuthorization;
+
+Auth0DeviceAuthorization auth0DeviceAuthorization = Auth0DeviceAuthorization();
+
+// Function that is called when a CAN Bus message is received
+void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessage, uint64_t data)
+{
+  Serial.println("Message received callback");
+  Serial.println("Sending message to MQTT");
+
+  // Create the MQTT topic string
+  String topic = userID + "/out/" + String(systemID) + "/" + String(baseStationID) + "/" + String(nodeID) + "/" + String(messageID);
+
+  // Allocate the JSON document
+  JsonDocument doc;
+
+  // Add the current time and the data from the CAN Bus message to the JSON doc
+  time_t now;
+  time(&now);
+  doc["time"] = now;
+  doc["data"] = data;
+
+  // Convert the JSON Doc to text
+  String payload = String(doc.as<String>());
+
+  // Send the message to the MQTT broker
+  mqttClient.publish(topic.c_str(), payload.c_str(), true);
+
+  // Check for alerts and warnings
+  if (messageID == WARN_ID || messageID == ALERT_ID)
+  {
+    // Only send an email if the alrt or warning message being turned on
+    if (data != 0)
+    {
+      Serial.println("Alert or Warning message received!!");
+
+      //core.sendMessage(ALERT_ID, &data);
+
+      // Send to email queue
+      AlertData alertData;
+      alertData.nodeID = nodeID;
+      alertData.isWarning = messageID == WARN_ID ? 1 : 0;
+
+      sendEmailToQueue(&alertData);
+
+      // Send to alert queue in UIAlertData, in the first slot where isCleared is set to 1
+      for (int i = 0; i < 50; i++)
+      {
+        if (alertQueue[i].isCleared == 1)
+        {
+          alertQueue[i].nodeID = nodeID;
+          alertQueue[i].isWarning = 0;
+          alertQueue[i].isSilenced = 0;
+          alertQueue[i].isCleared = 0;
+          baseStationState = 4;
+          errorQueued = 1;
+          delay(10);
+          break;
+        }
+      }
+
+      // xQueueSend(emailQueue, &alertData, portMAX_DELAY);
+    }
+
+    // TODO: Trigger hardware alert on the base station
+  }
+
+  // //Log the CAN Bus message to the SD card
+
+  // Log the message to the SD card
+
+  if (logMessage)
+  {
+    Serial.println("Logging message");
+    writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+  }
+  else
+  {
+    Serial.println("Not logging message");
+  }
+
+  delay(10);
+
+  // mqttClient.loop();
+}
+
+// Function to connect to the MQTT broker
+void MQTTConnect()
+{
+  // Loop until we're reconnected
+  while (!mqttClient.connected())
+  {
+    Serial.print("Attempting MQTT connection...");
+
+    mqttLogin = deviceAuthorization->getMQTTLogin(false);
+
+    // Set the MQTT server and port
+    mqttClient.setServer(mqttLogin.getServer(), mqttLogin.getPort());
+
+    // Create a random client ID
+    // TODO: use the system ID and base station ID to create a unique client ID?
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+
+    // Attempt to connect
+    Serial.print("Connecting to MQTT broker: ");
+    Serial.println(mqttLogin.getServer());
+    Serial.println(mqttLogin.getPassword());
+    if (mqttClient.connect(clientId.c_str(), "", mqttLogin.getPassword().c_str()))
+    {
+      Serial.println("connected");
+      // Subscribe to the MQTT topic for this base station
+
+      userID = auth0DeviceAuthorization.getUserID();
+      Serial.println("UserID: " + userID);
+
+      String topicIn = userID + "/in/" + String(systemID) + "/" + String(baseStationID) + "/#";
+      String topicHistory = userID + "/historyIn/" + String(systemID) + "/" + String(baseStationID) + "/#";
+      String topicManifest = userID + "/manifestIn/" + String(systemID) + "/" + String(baseStationID);
+
+      Serial.println("starting delay for mqtt");
+      digitalWrite(11, HIGH);
+      delay(8000);
+      Serial.println("delay finished");
+
+      mqttClient.subscribe(topicIn.c_str());
+      mqttClient.subscribe(topicHistory.c_str());
+      mqttClient.subscribe(topicManifest.c_str());
+
+      // Send manifest data to the MQTT broker
+      if (LittleFS.exists(manifestFileName))
+      {
+        Serial.println("Manifest file exists, sending to MQTT");
+        File manifestFile = LittleFS.open(manifestFileName, FILE_READ);
+        String manifestString = manifestFile.readString();
+        manifestFile.close();
+
+        String topic = userID + "/manifestOut/" + String(systemID) + "/" + String(baseStationID);
+
+        // Send the manifest data to the MQTT broker
+        mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
+      }
+      else
+      {
+        Serial.println("Manifest file does not exist");
+      }
+
+      digitalWrite(11, HIGH);
+
+      /* //Send manifest data to the MQTT broker
+      if(SD.exists(manifestFileName)) {
+        Serial.println("Manifest file exists, sending to MQTT");
+        File manifestFile = SD.open(manifestFileName, FILE_READ);
+        String manifestString = manifestFile.readString();
+        manifestFile.close();
+        String topic = "manifestOut/" + String(systemID) + "/" + String(baseStationID);
+
+        //Send the manifest data to the MQTT broker
+        mqttClient.publish(topic.c_str(), manifestString.c_str(), true);
+
+      }else{
+        Serial.println("Manifest file does not exist");
+      } */
+    }
+    else
+    {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+void MQTTdisconnect()
+{
+  mqttClient.disconnect();
+  // end the MQTT task
+  vTaskDelete(xMQTTloop);
+}
+
+void receivedMQTTMessage(char *topic, byte *payload, unsigned int length)
+{
+  /*   Serial.print("Message arrived [");
+    Serial.print(topic);
+    Serial.print("] ");
+    for (int i = 0; i < length; i++) {
+      Serial.print((char)payload[i]);
+    }
+    Serial.println(); */
+
+  // Parse the topic to get the node ID and message ID with the format:
+  //  userID/in/systemID/baseStationID/nodeID/messageID/
+  String topicString = String(topic);
+  int index = 0;
+  index = topicString.indexOf("/", index);
+  index = topicString.indexOf("/", index);
+  String type = topicString.substring(index + 1, topicString.indexOf("/", index + 1));
+  index = topicString.indexOf("/", index + 1);
+  index = topicString.indexOf("/", index + 1);
+  index = topicString.indexOf("/", index + 1);
+  int nodeID = topicString.substring(index + 1, topicString.indexOf("/", index + 1)).toInt();
+  index = topicString.indexOf("/", index + 1);
+  int messageID = topicString.substring(index + 1, topicString.indexOf("/", index + 1)).toInt();
+
+  Serial.print("Type: ");
+  Serial.println(type);
+  Serial.print("Node ID: ");
+  Serial.println(nodeID);
+  Serial.print("Message ID: ");
+  Serial.println(messageID);
+
+  // Allocate the JSON document
+  JsonDocument doc;
+
+  // Parse the JSON object
+  DeserializationError error = deserializeJson(doc, payload);
+
+  // Test if parsing succeeds
+  if (error)
+  {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.c_str());
+    Serial.println((char *)payload);
+  }
+  else
+  {
+    // Don't use doc["data"].as<uint64_t>() because it will cause a zero to be sent over the CAN bus
+    // TODO fix this global variable hack
+    uint64_t data = doc["data"];
+    Serial.print("Data: ");
+    Serial.println(data);
+
+    // Regular message
+    if (type == "in")
+    {
+      // Set the node ID in the Node Controller Core to the node ID of the received message
+      // TODO: This is a workaround until we move the Node Controller Core code to the base station codebase
+      Serial.print("Sending message with Node ID: ");
+      Serial.print(nodeID, HEX);
+      Serial.print(" Message ID: ");
+      Serial.print(messageID, HEX);
+      Serial.print(" Data: ");
+      Serial.println(data, HEX);
+
+      if (nodeID == NODE_ID)
+      {
+        Serial.println("Message received to self");
+        // Check for messages
+        switch (messageID)
+        {
+        case LED_BRIGHTNESS_MESSAGE_ID:
+          Serial.println("LED Brightness message received");
+          LEDBrightness = ((maxPWM / 100.0) * data);
+          pixels.setBrightness(LEDBrightness);
+          pixels.show();
+          break;
+
+          case RESET_ALERTS:
+            Serial.println("Reset alerts message received");
+            for (int i = 0; i < 50; i++)
+            {
+              alertQueue[i].isSilenced = 1;
+            }
+            break;
+
+        default:
+          Serial.println("Unknown message ID");
+          break;
+        }
+      }
+      
+
+      // Create a CAN Bus message
+      twai_message_t message = core.create_message(messageID, nodeID, &data);
+
+      if (twai_transmit(&message, 2000) == ESP_OK)
+      {
+        Serial.println("Test Message queued for transmission");
+      }
+      else
+      {
+        Serial.println("Test Failed to queue message for transmission");
+      }
+
+      // Log the message to the SD card
+      // mqttClient.loop();
+      // writeLogData(systemID, baseStationID, String(baseStationFirmwareVersion), nodeID, messageID, data);
+    }
+    // History message
+    else if (type == "historyIn")
+    {
+      Serial.println("History message received for node: " + String(nodeID) + " message: " + String(messageID) + "hours: " + String(data));
+
+      // Send the requested history data to the MQTT broker, data is the number of hours to read
+      JsonDocument historyDoc;
+      sendLogData(userID, systemID, baseStationID, nodeID, messageID, data, &mqttClient);
+    }
+    else if (type == "manifestIn")
+    {
+      Serial.println("Manifest message received");
+
+      if (LittleFS.exists(manifestFileName))
+      {
+        Serial.println("Manifest file exists, replacing");
+        LittleFS.remove(manifestFileName);
+        File manifestFile = LittleFS.open(manifestFileName, FILE_WRITE);
+        Serial.println(doc.as<String>());
+        manifestFile.write(payload, length);
+        manifestFile.close();
+      }
+      else
+      {
+        Serial.println("Manifest file does not exist, creating new file");
+        File manifestFile = LittleFS.open(manifestFileName, FILE_WRITE);
+        manifestFile.write(payload, length);
+        manifestFile.close();
+      }
+
+      /* if(SD.exists(manifestFileName)) {
+        Serial.println("Manifest file exists, replacing");
+        SD.remove(manifestFileName);
+        File manifestFile = SD.open(manifestFileName, FILE_WRITE);
+        manifestFile.write(payload, length);
+        manifestFile.close();
+      }else
+      {
+        Serial.println("Manifest file does not exist, creating new file");
+        File manifestFile = SD.open(manifestFileName, FILE_WRITE);
+        manifestFile.write(payload, length);
+        manifestFile.close();
+      } */
+
+      // Send the manifest data to the MQTT broker
+
+      Serial.println("Sending manifest data to MQTT");
+      String manifestTopic = userID + "/manifestOut/" + String(systemID) + "/" + String(baseStationID);
+
+      mqttClient.publish(manifestTopic.c_str(), doc.as<String>().c_str(), true);
+    }
+    else
+    {
+      Serial.println("Unknown message type");
+    }
+  }
+
+  delay(100);
+}
+
+void annoyingBuzz()
+{
+  if (digitalRead(1) == HIGH && antiBuzzer == 0)
+  {
+    // for(int i = 0; i < 1; i++){
+    digitalWrite(48, HIGH);
+    // Serial.println("Bzzzzz");
+    delay(50);
+    digitalWrite(48, LOW);
+    // delay(100);
+  }
+  else
+  {
+    // Serial.println("Buzzer is off");
+  }
+}
+
+void testCurrentSense()
+{
+  // Serial.println("Testing current");
+  // shuntvoltage = ina219.getShuntVoltage_mV();
+  // busvoltage = ina219.getBusVoltage_V();
+  current_mA = ina219.getCurrent_mA();
+  // power_mW = ina219.getPower_mW();
+  // loadvoltage = busvoltage + (shuntvoltage / 1000);
+  // Serial.println("Success");
+}
+
+void setup()
 void updateRTC(void *parameters);
 void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessage, uint64_t data);
 void MQTTConnect();
@@ -642,8 +1032,10 @@ void setup() // ----------------------------------------------------------------
   // espClient.setCACert(CA_cert);
   espClient.setInsecure();
 
-  // Set the MQTT server and port
-  mqttClient.setServer(mqtt_server, 8883);
+  // TODO: Add a check to see if the SD card is still mounted, if not remount it
+  // TODO: Add a check to see if the WiFi is still connected, if not reconnect
+
+  deviceAuthorization = &auth0DeviceAuthorization;
 
   // Set the MQTT callback function
   mqttClient.setCallback(receivedMQTTMessage);
@@ -654,8 +1046,6 @@ void setup() // ----------------------------------------------------------------
   mqttClient.setKeepAlive(30);
   mqttClient.setSocketTimeout(30);
 
-  // TODO: Add a check to see if the SD card is still mounted, if not remount it
-  // TODO: Add a check to see if the WiFi is still connected, if not reconnect
   initSDCard();
 
   initEmailClient();
