@@ -960,10 +960,10 @@ void setup() // ----------------------------------------------------------------
   struct tm timeinfo;
   getLocalTime(&timeinfo);
   time_t UNIXtime = time(NULL);
-  localTimeZone = ("UTC+" + String(localTimeZoneOffset));
-  localTimeZone.toCharArray(buf_localTimeZone, 8);
-  setenv("TZ", buf_localTimeZone, 1);
-  tzset();
+  //localTimeZone = ("UTC+" + String(localTimeZoneOffset));
+  //localTimeZone.toCharArray(buf_localTimeZone, 8);
+  //setenv("TZ", buf_localTimeZone, 1);
+  //tzset();
   localtime_r(&UNIXtime, &timeinfo);
   strftime(localTime, sizeof(localTime), "%c", &timeinfo);
 
@@ -2570,10 +2570,10 @@ void updateRTC(void *parameters)
     uint64_t unixTimeData;
     time_t UNIXtime = time(NULL);
     unixTimeData = (uint64_t)UNIXtime; //  Gets the unix time from the ntp server and stores it in the now variable
-    localTimeZone = ("UTC+" + String(localTimeZoneOffset));
-    localTimeZone.toCharArray(buf_localTimeZone, 8);
-    setenv("TZ", buf_localTimeZone, 1);
-    tzset();
+    //localTimeZone = ("UTC+" + String(localTimeZoneOffset));
+    //localTimeZone.toCharArray(buf_localTimeZone, 8);
+    //setenv("TZ", buf_localTimeZone, 1);
+    //tzset();
     localtime_r(&UNIXtime, &timeinfo);
     strftime(localTime, sizeof(localTime), "%c", &timeinfo);
 
