@@ -2550,7 +2550,7 @@ void updateRTC(void *parameters)
 {
   while (1)
   {
-    Serial.println("Running void updateRTC(void *parameters)");
+    //Serial.println("Running void updateRTC(void *parameters)");
     delay(1000);
     // Time--------------------------------------------------------------------------------------
 
