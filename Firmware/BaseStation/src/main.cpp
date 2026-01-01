@@ -64,7 +64,7 @@ uint64_t lastRTCUpdate = millis();
 
 // TODO: Manual system ID and base station ID, temp untils automatic paring is implemented
 #define SYSTEM_ID 0x00      // Leave
-#define BASESTATION_ID 0x04 // change for desired base station ID -> 0 = Sebastien Pacific Terrarium, 4 =Kayleb's test station, 3 = Kayleb's Reef
+#define BASESTATION_ID 0x03 // change for desired base station ID -> 0 = Sebastien Pacific Terrarium, 4 =Kayleb's test station, 3 = Kayleb's Reef
 
 // TODO: MQTT Credentials - temp until these are added to WiFiManager system
 char mqtt_server[255] = "projectfishworks.ca";
@@ -1274,7 +1274,7 @@ void handleManifestMessage(JsonDocument &doc, byte *payload, unsigned int length
   }
 
   Serial.println("Sending manifest data to MQTT");
-  String manifestTopic = "manifestOut/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
+  String topicManifest = userID + "/manifestOut/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
   mqttClient.publish(manifestTopic.c_str(), doc.as<String>().c_str(), true);
   Serial.println("Manifest data sent to MQTT");
   Serial.println("");
