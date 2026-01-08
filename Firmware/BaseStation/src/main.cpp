@@ -982,8 +982,8 @@ void setup() // ----------------------------------------------------------------
   // Set the MQTT callback function
   mqttClient.setCallback(receivedMQTTMessage);
 
-  // The max payload size we can send. This seems to be the max size you can use.
-  mqttClient.setBufferSize(34464);
+  //TODO figure out what buffer size we actually need here
+  mqttClient.setBufferSize(5120);
 
   mqttClient.setKeepAlive(30);
   mqttClient.setSocketTimeout(30);
