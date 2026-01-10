@@ -239,6 +239,10 @@ QueueHandle_t log_file_queue;
 // Global data fix for pointer issues, TODO fix this shit
 // uint64_t data = 0;
 
+//Node Paring
+#define PARING_HARDWARE_ID_MESSAGE_ID 0x6D0 //1744
+#define READY_FOR_DATA_MESSAGE_ID 0x6D1 //1745
+
 // Put Functon Declarations here -----------------------------------------------------------------------------------
 void saveConfigCallback();
 void mqttLoop(void *_this);
@@ -259,6 +263,7 @@ void resetAlerts();
 void handleHistoryMessage(int nodeID, int messageID, uint64_t data);
 void handleManifestMessage(JsonDocument &doc, byte *payload, unsigned int length);
 void sendTimezoneOffsetMessage(uint64_t data);
+void subscribeToNodeTopic(uint8_t _systemID, uint8_t _baseStationID, uint8_t _nodeID);
 
 // Authrise the device
 
@@ -271,6 +276,30 @@ void receivedCANBUSMessage(uint8_t nodeID, uint16_t messageID, uint8_t logMessag
 {
   Serial.println("Message received callback");
   Serial.println("Sending message to MQTT");
+
+  if(messageID == READY_FOR_DATA_MESSAGE_ID){
+    Serial.println("Node: " + String(nodeID) + " is ready for data, subscribing to its topic");
+    subscribeToNodeTopic(SYSTEM_ID, BASESTATION_ID, nodeID);
+    return;
+  }
+  else if(messageID == PARING_HARDWARE_ID_MESSAGE_ID){
+    Serial.println("Received hardware ID from node: " + String(nodeID) + ", ID: " + String(data));
+
+    //All the paring stuff
+
+    // Create a CAN Bus message
+      twai_message_t message = core.create_message(messageID, nodeID, &data);
+
+      if (twai_transmit(&message, 2000) == ESP_OK)
+      {
+        Serial.println("Test Message queued for transmission");
+      }
+      else
+      {
+        Serial.println("Test Failed to queue message for transmission");
+      }
+    return;
+  }
 
   // Create the MQTT topic string
   String topic = userID + "/out/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID) + "/" + String(nodeID) + "/" + String(messageID);
@@ -378,8 +407,6 @@ void MQTTConnect()
       userID = auth0DeviceAuthorization.getUserID();
       Serial.println("UserID: " + userID);
 
-      String topicIn = userID + "/in/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID) + "/#";
-      String topicHistory = userID + "/historyIn/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID) + "/#";
       String topicManifest = userID + "/manifestIn/" + String(SYSTEM_ID) + "/" + String(BASESTATION_ID);
 
       Serial.println("starting delay for mqtt");
@@ -387,8 +414,6 @@ void MQTTConnect()
       delay(8000);
       Serial.println("delay finished");
 
-      mqttClient.subscribe(topicIn.c_str());
-      mqttClient.subscribe(topicHistory.c_str());
       mqttClient.subscribe(topicManifest.c_str());
 
       // Send manifest data to the MQTT broker
@@ -1165,9 +1190,6 @@ void saveConfigCallback()
   shouldSaveConfig = true;
   Serial.println("");
 }
-
-
-
   
 // function to handle internal messages from the MQTT broker
 void handleInternalMessage(int messageID, uint64_t data)
@@ -2641,4 +2663,17 @@ void SendMQTTMessage(uint8_t _systemID, uint8_t _baseStationID, uint8_t _nodeID,
   Serial.println("topic = " + String(topic));
   Serial.println("payload = " + String(payload));
   Serial.println("");
+}
+
+void subscribeToNodeTopic(uint8_t _systemID, uint8_t _baseStationID, uint8_t _nodeID)
+{
+  // Create the MQTT topic string
+  String topicIn = userID + "/in/" + String(_systemID) + "/" + String(_baseStationID) + "/" + String(_nodeID) + "/#";
+  String topicHistory = userID + "/historyIn/" + String(_systemID) + "/" + String(_baseStationID) + "/" + String(_nodeID) + "/#";
+  Serial.println("Subscribing to topic: " + topicIn);
+  Serial.println("Subscribing to topic: " + topicHistory);
+
+  // Subscribe to the topic
+  mqttClient.subscribe(topicIn.c_str());
+  mqttClient.subscribe(topicHistory.c_str());
 }
